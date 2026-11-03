@@ -138,6 +138,9 @@ Singleton {
     readonly property bool gameModeSilent: user.gameModeSilent ?? true
     // GoXLR profile to load while playing, the one before comes back after; empty: none
     readonly property string goxlrGameProfile: user.goxlrGameProfile ?? ""
+    // Over a fullscreen window (a game's menu, the mouse free) the bar comes down while the
+    // mouse rests on the top edge of the screen, and goes up again once it leaves the bar
+    readonly property bool barOverFullscreen: user.barOverFullscreen ?? true
 
     // ── Keyboard (AULA F75, Super+K) ─────────────────────────
 

@@ -662,6 +662,11 @@ FocusScope {
                             title: "quiet while playing"
                             hint: "popups stay away, calls and alarms still come through"
                         }
+                        BoolSetting {
+                            key: "barOverFullscreen"
+                            title: "bar at the top edge over fullscreen"
+                            hint: "rest the mouse on the top edge in a game's menu, the bar comes down over it"
+                        }
                         TextSetting {
                             key: "gameClasses"
                             list: true
