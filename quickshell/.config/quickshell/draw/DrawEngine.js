@@ -208,6 +208,19 @@ function onRuler(r, p) {
     return Math.abs(l.along) <= r.len / 2 && l.across <= 0 && l.across >= -r.h;
 }
 
+// Screen pixels at either end of the body that turn the ruler instead of moving it
+var RULER_GRIP = 26;
+
+// On one of the grips; u is one screen pixel in document units
+function onRulerEnd(r, p, u) {
+    return onRuler(r, p) && Math.abs(rulerLocal(r, p).along) >= r.len / 2 - RULER_GRIP * u;
+}
+
+// Direction from the ruler's centre to p, in degrees like r.a
+function rulerAngleTo(r, p) {
+    return Math.atan2(p.y - r.y, p.x - r.x) * 180 / Math.PI;
+}
+
 // A pen point near the edge lands on it; u is one screen pixel in document units
 function snapToRuler(r, p, u) {
     var l = rulerLocal(r, p);
@@ -326,6 +339,11 @@ function paintRuler(ctx, r, view, colorOf, family) {
             ctx.fillText(String(i / 5), x + 2 * u, -16 * u);
     }
     ctx.fillStyle = colorOf("muted");
-    ctx.fillText(rulerDegrees(r.a) + "°", -g.len / 2 + 6 * u, -g.h + 12 * u);
+    // Three ridges at each end: the grips that turn it
+    for (var side = -1; side <= 1; side += 2) {
+        for (var j = 0; j < 3; j++)
+            ctx.fillRect(side * (g.len / 2 - (7 + 4 * j) * u), -g.h + 6 * u, u, 10 * u);
+    }
+    ctx.fillText(rulerDegrees(r.a) + "°", -g.len / 2 + 22 * u, -g.h + 14 * u);
     ctx.restore();
 }

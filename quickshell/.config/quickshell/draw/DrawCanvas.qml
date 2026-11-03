@@ -191,21 +191,26 @@ Item {
     MouseArea {
         id: area
 
-        // draw | erase | ruler | pan, for the press in progress
+        // draw | erase | ruler | turn | pan, for the press in progress
         property string mode: ""
         property var start: null
         property var rulerFrom: null
+        // Turning: the ruler's angle minus the grab's direction from its centre
+        property real turnOffset: 0
         property real lastX: 0
         property real lastY: 0
         property bool erased: false
         readonly property bool overRuler: root.tools.ruler && root.tools.rulerAt !== null
             && Engine.onRuler(root.tools.rulerAt, root.toDoc(mouseX, mouseY))
+        readonly property bool overRulerEnd: overRuler
+            && Engine.onRulerEnd(root.tools.rulerAt, root.toDoc(mouseX, mouseY), 1 / root.scale)
 
         anchors.fill: parent
         enabled: root.active
         hoverEnabled: true
         acceptedButtons: root.rightDragPans ? Qt.LeftButton | Qt.RightButton : Qt.LeftButton
-        cursorShape: mode === "pan" ? Qt.ClosedHandCursor
+        cursorShape: mode === "pan" || mode === "turn" ? Qt.ClosedHandCursor
+            : overRulerEnd ? Qt.OpenHandCursor
             : mode === "ruler" || overRuler ? Qt.SizeAllCursor
             : root.tools.tool === "text" ? Qt.IBeamCursor
             : root.tools.tool === "erase" ? Qt.BlankCursor
@@ -226,7 +231,15 @@ Item {
                 return;
             }
             const d = root.toDoc(mouse.x, mouse.y);
-            if (overRuler) {
+            // Checked at the press itself: mouseX still holds the last hover until the bindings catch up
+            const r = root.tools.ruler ? root.tools.rulerAt : null;
+            // The grips at its ends turn the ruler around its centre
+            if (r && Engine.onRulerEnd(r, d, 1 / root.scale)) {
+                mode = "turn";
+                turnOffset = root.tools.rulerAt.a - Engine.rulerAngleTo(root.tools.rulerAt, d);
+                return;
+            }
+            if (r && Engine.onRuler(r, d)) {
                 mode = "ruler";
                 start = d;
                 rulerFrom = Object.assign({}, root.tools.rulerAt);
@@ -272,6 +285,14 @@ Item {
             const d = root.toDoc(mouse.x, mouse.y);
             if (mode === "ruler") {
                 root.tools.rulerAt = Object.assign({}, rulerFrom, { x: rulerFrom.x + d.x - start.x, y: rulerFrom.y + d.y - start.y });
+                return;
+            }
+            if (mode === "turn") {
+                let a = Engine.rulerAngleTo(root.tools.rulerAt, d) + turnOffset;
+                // Shift holds it to 15° steps
+                if (mouse.modifiers & Qt.ShiftModifier)
+                    a = Math.round(a / 15) * 15;
+                root.tools.rulerAt = Object.assign({}, root.tools.rulerAt, { a });
                 return;
             }
             if (mode === "erase") {

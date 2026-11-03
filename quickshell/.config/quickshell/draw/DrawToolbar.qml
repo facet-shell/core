@@ -201,7 +201,7 @@ Item {
             Group {
                 IconButton {
                     glyph: Engine.GLYPHS.ruler
-                    name: "ruler · drag it, the wheel turns it, the pen follows its edge"
+                    name: "ruler · drag it, turn it by its ends or the wheel, the pen follows its edge"
                     active: root.tools.ruler
                     onClicked: root.tools.ruler = !root.tools.ruler
                 }
