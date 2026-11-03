@@ -3,10 +3,13 @@ import QtQuick.Layouts
 import Quickshell
 import qs.components
 import qs.config
+import qs.draw
+import "../draw/DrawEngine.js" as Engine
 
-// The picture editor: blur boxes and pictures on top of a screenshot (or any picture) and a
-// crop, exported as <name>-edit.png. Same boxes as the video editor (OverlayBox.qml), no
-// timeline. Loaded by EditorWindow.qml.
+// The picture editor: blur boxes and pictures on top of a screenshot (or any picture), a
+// drawing (the Super+P tools, docked on the left) and a crop, exported as <name>-edit.png.
+// Same boxes as the video editor (OverlayBox.qml), no timeline. Paint is this editor with
+// an empty page (Editor.newPicture). Loaded by EditorWindow.qml.
 FocusScope {
     id: root
 
@@ -35,9 +38,17 @@ FocusScope {
         return "file://" + path.split("/").map(encodeURIComponent).join("/");
     }
 
+    // The drawing tools; "" is the pointer (blur boxes and crop). An empty page from paint
+    // starts with the pen, a screenshot with the pointer.
+    DrawTools {
+        id: drawTools
+        tool: ""
+    }
+
     function openFile(path) {
         selected = null;
         cropping = false;
+        drawTools.tool = path.includes("/paintings/") ? "pen" : "";
         project.load(path);
         picture.source = fileUrl(path);
         forceActiveFocus();
@@ -53,7 +64,14 @@ FocusScope {
 
     function addBlur() {
         cropping = false;
+        drawTools.tool = "";
         select({ kind: "overlay", id: project.addBlur(0.5, 0.5) });
+    }
+
+    function toggleCrop() {
+        cropping = !cropping;
+        if (cropping)
+            drawTools.tool = "";
     }
 
     function removeSelected() {
@@ -65,13 +83,19 @@ FocusScope {
 
     Keys.onPressed: event => {
         const ctrl = event.modifiers & Qt.ControlModifier;
-        if (event.key === Qt.Key_B)
+        const shift = event.modifiers & Qt.ShiftModifier;
+        if (event.key === Qt.Key_B && !ctrl)
             addBlur();
         else if (event.key === Qt.Key_C && !ctrl)
-            cropping = !cropping;
+            toggleCrop();
+        else if (event.key === Qt.Key_V && !ctrl)
+            drawTools.tool = "";
         else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace)
             removeSelected();
-        else if (event.key === Qt.Key_Z && ctrl) {
+        else if ((event.key === Qt.Key_Z && ctrl && shift) || (event.key === Qt.Key_Y && ctrl)) {
+            if (project.redo())
+                select(null);
+        } else if (event.key === Qt.Key_Z && ctrl) {
             if (project.undo())
                 select(null);
         } else if (event.key === Qt.Key_S && ctrl)
@@ -79,6 +103,11 @@ FocusScope {
         else if (event.key === Qt.Key_Escape) {
             select(null);
             cropping = false;
+            drawTools.tool = "";
+        } else if (drawBar.handleKey(event)) {
+            // A drawing tool's letter (p h l a r e t x)
+            cropping = false;
+            select(null);
         } else
             return;
         event.accepted = true;
@@ -111,11 +140,89 @@ FocusScope {
         }
     }
 
+    // The drawing at the picture's full size for the export (ImageProject.drawingNeeded). A
+    // Canvas paints only inside the window, so it sits in a clipped 1×1 corner, out of
+    // sight, and has the picture's size only while an export waits for it.
+    Item {
+        width: 1
+        height: 1
+        clip: true
+
+        Canvas {
+            id: exportInk
+
+            property string file: ""
+
+            width: file !== "" ? Math.max(1, project.imageWidth) : 1
+            height: file !== "" ? Math.max(1, project.imageHeight) : 1
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
+                ctx.clearRect(0, 0, width, height);
+                if (file !== "")
+                    Engine.paintShapes(ctx, project.shapes, { ox: 0, oy: 0, k: 1 }, role => Theme[role] ?? Theme.accent, Theme.font);
+            }
+            onPainted: {
+                if (file === "" || width !== project.imageWidth)
+                    return;
+                const target = file;
+                file = "";
+                renderTimeout.stop();
+                project.drawingReady(save(target));
+            }
+        }
+
+        Timer {
+            id: renderTimeout
+            interval: 8000
+            onTriggered: {
+                exportInk.file = "";
+                project.drawingReady(false);
+            }
+        }
+
+        Connections {
+            target: project
+
+            function onDrawingNeeded(file) {
+                exportInk.file = file;
+                renderTimeout.restart();
+                exportInk.requestPaint();
+            }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.margins: 22
         anchors.topMargin: 26
         spacing: 22
+
+        DrawToolbar {
+            id: drawBar
+
+            Layout.alignment: Qt.AlignTop
+            Layout.preferredWidth: implicitWidth
+            Layout.preferredHeight: implicitHeight
+            tools: drawTools
+            store: project
+            vertical: true
+            selectTool: true
+            title: "tools"
+
+            Connections {
+                target: drawTools
+
+                // A drawing tool takes the mouse from the boxes and the crop
+                function onToolChanged() {
+                    if (drawTools.tool !== "") {
+                        root.cropping = false;
+                        root.select(null);
+                    }
+                    root.forceActiveFocus();
+                }
+            }
+        }
 
         Frame {
             Layout.fillWidth: true
@@ -180,6 +287,17 @@ FocusScope {
                                     root.forceActiveFocus();
                                 }
                             }
+                        }
+
+                        // The drawing, above the boxes like in the export; in picture pixels.
+                        // With the pointer (no drawing tool) clicks go to the boxes below.
+                        DrawCanvas {
+                            anchors.fill: parent
+                            store: project
+                            tools: drawTools
+                            scale: project.imageWidth > 0 ? frameArea.width / project.imageWidth : 1
+                            active: drawTools.tool !== "" && !root.cropping && project.imageWidth > 0
+                            keyTarget: root
                         }
 
                         // ── Crop: dimmed outside, the kept part framed ──
@@ -318,7 +436,7 @@ FocusScope {
                     Action {
                         text: "⌗ crop"
                         active: root.cropping
-                        onClicked: root.cropping = !root.cropping
+                        onClicked: root.toggleCrop()
                     }
 
                     Action {
@@ -330,7 +448,9 @@ FocusScope {
                         Layout.fillWidth: true
                         color: Theme.muted
                         font.pixelSize: 12
-                        text: "b blur box · c crop · del remove · ctrl+z undo · ctrl+s export · drop a picture on it"
+                        // The drawing toolbar's hover names the button here, where there is room
+                        text: drawBar.hint !== "" ? drawBar.hint
+                            : "b blur box · c crop · p h l a r e t x draw · v pointer · ctrl+z undo · ctrl+s export · drop a picture on it"
                     }
 
                     Action {
@@ -396,7 +516,7 @@ FocusScope {
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
                         color: Theme.muted
-                        text: `${project.overlays.filter(o => o.type === "picture").length} pictures · ${project.overlays.filter(o => o.type === "blur").length} blur boxes`
+                        text: `${project.overlays.filter(o => o.type === "picture").length} pictures · ${project.overlays.filter(o => o.type === "blur").length} blur boxes · ${project.shapes.length} drawn`
                     }
                     Label {
                         Layout.fillWidth: true

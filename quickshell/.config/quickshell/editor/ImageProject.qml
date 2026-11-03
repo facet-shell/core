@@ -3,9 +3,11 @@ import Quickshell
 import Quickshell.Io
 import qs.services
 
-// One picture being edited: blur boxes and pictures on top, and a crop. Kept next to the
-// picture as <name>.edit.json; the picture itself is never changed, export writes
-// <name>-edit.png. x, y, w, h (overlays and the crop) are fractions of the picture.
+// One picture being edited: blur boxes and pictures on top, a drawing (draw/, the same
+// tools as Super+P) and a crop. Kept next to the picture as <name>.edit.json; the picture
+// itself is never changed, export writes <name>-edit.png. x, y, w, h (overlays and the
+// crop) are fractions of the picture; the drawing's shapes are in picture pixels
+// (draw/DrawEngine.js), so the export draws them at full resolution.
 Scope {
     id: root
 
@@ -20,10 +22,12 @@ Scope {
     property int imageHeight: 0
 
     property var overlays: []
+    property var shapes: []
     property var crop: ({ x: 0, y: 0, w: 1, h: 1 })
     readonly property bool cropped: crop.x > 0.001 || crop.y > 0.001 || crop.w < 0.999 || crop.h < 0.999
 
     property var undoStack: []
+    property var redoStack: []
     // Something was changed since the last write; opening alone writes no file
     property bool dirty: false
 
@@ -36,7 +40,9 @@ Scope {
         imageWidth = 0;
         imageHeight = 0;
         undoStack = [];
+        redoStack = [];
         overlays = [];
+        shapes = [];
         crop = { x: 0, y: 0, w: 1, h: 1 };
         editView.path = editFile;
         try {
@@ -44,6 +50,7 @@ Scope {
             const saved = text.trim() !== "" ? JSON.parse(text) : null;
             if (saved && saved.version === 1) {
                 overlays = saved.overlays ?? [];
+                shapes = saved.shapes ?? [];
                 crop = saved.crop ?? crop;
             }
         } catch (e) {
@@ -60,7 +67,7 @@ Scope {
         if (!dirty || editFile === "")
             return;
         dirty = false;
-        editView.setText(JSON.stringify({ version: 1, image, overlays, crop }, null, 1));
+        editView.setText(JSON.stringify({ version: 1, image, overlays, shapes, crop }, null, 1));
     }
 
     Timer {
@@ -77,19 +84,67 @@ Scope {
 
     // ── Editing ──────────────────────────────────────────────
 
+    function state() {
+        return JSON.stringify({ overlays, shapes, crop });
+    }
+
+    function restore(text) {
+        const last = JSON.parse(text);
+        overlays = last.overlays;
+        shapes = last.shapes ?? [];
+        crop = last.crop;
+        changed();
+    }
+
     function snapshot() {
-        undoStack = undoStack.concat([JSON.stringify({ overlays, crop })]).slice(-60);
+        undoStack = undoStack.concat([state()]).slice(-60);
+        redoStack = [];
     }
 
     function undo() {
         if (undoStack.length === 0)
             return false;
-        const last = JSON.parse(undoStack[undoStack.length - 1]);
+        redoStack = redoStack.concat([state()]);
+        const last = undoStack[undoStack.length - 1];
         undoStack = undoStack.slice(0, -1);
-        overlays = last.overlays;
-        crop = last.crop;
-        changed();
+        restore(last);
         return true;
+    }
+
+    function redo() {
+        if (redoStack.length === 0)
+            return false;
+        undoStack = undoStack.concat([state()]);
+        const next = redoStack[redoStack.length - 1];
+        redoStack = redoStack.slice(0, -1);
+        restore(next);
+        return true;
+    }
+
+    // ── Drawing: the calls DrawCanvas and DrawToolbar make, as on draw/DrawDoc.qml ──
+
+    function addShape(shape) {
+        snapshot();
+        shapes = shapes.concat([shape]);
+        changed();
+    }
+
+    // undoable false: the eraser's later hits in the same drag
+    function removeShapes(indices, undoable) {
+        if (indices.length === 0)
+            return;
+        if (undoable !== false)
+            snapshot();
+        shapes = shapes.filter((s, i) => !indices.includes(i));
+        changed();
+    }
+
+    function clearShapes() {
+        if (shapes.length === 0)
+            return;
+        snapshot();
+        shapes = [];
+        changed();
     }
 
     function nextId() {
@@ -158,8 +213,12 @@ Scope {
     property bool deleteAfterExport: false
     signal originalDeleted()
     property string exportError: ""
+    // The drawing at the picture's size as a PNG, rendered by the view (drawingNeeded) and
+    // laid over the picture by ffmpeg; "" without a drawing
+    property string drawingFile: ""
+    signal drawingNeeded(string file)
 
-    // ffmpeg's arguments: blur boxes and pictures on the full picture, the crop last
+    // ffmpeg's arguments: blur boxes, pictures and the drawing on the full picture, the crop last
     function exportArgs() {
         const W = imageWidth, H = imageHeight;
         const px = (v, d) => Math.max(0, Math.round(v * d));
@@ -168,7 +227,11 @@ Scope {
         const args = ["-y", "-nostdin", "-v", "error", "-i", image];
         for (const o of pictures)
             args.push("-i", o.src);
+        if (drawingFile !== "")
+            args.push("-i", drawingFile);
 
+        // overlay works in yuv420 unless told otherwise (format=auto keeps RGBA): thin colored
+        // lines and text of the drawing would get blurred color edges
         const fc = ["[0:v]format=rgba[base]"];
         let last = "base";
         let k = 0;
@@ -185,17 +248,24 @@ Scope {
             }
             fc.push(`[${last}]split[b${k}][s${k}]`);
             fc.push(`[s${k}]crop=${w}:${h}:${x}:${y},${fx}[f${k}]`);
-            fc.push(`[b${k}][f${k}]overlay=${x}:${y}[o${k}]`);
+            fc.push(`[b${k}][f${k}]overlay=${x}:${y}:format=auto[o${k}]`);
             last = `o${k}`;
             k++;
         }
         pictures.forEach((o, i) => {
             const ph = o.h > 0 ? o.h : o.w;
             fc.push(`[${1 + i}:v]scale=${Math.max(2, px(o.w, W))}:${Math.max(2, px(ph, H))},format=rgba,colorchannelmixer=aa=${Number(o.opacity.toFixed(3))}[p${i}]`);
-            fc.push(`[${last}][p${i}]overlay=${px(o.x, W)}:${px(o.y, H)}[o${k}]`);
+            fc.push(`[${last}][p${i}]overlay=${px(o.x, W)}:${px(o.y, H)}:format=auto[o${k}]`);
             last = `o${k}`;
             k++;
         });
+        // Rendered at the picture's size; scaled anyway in case a HiDPI canvas doubled it
+        if (drawingFile !== "") {
+            fc.push(`[${1 + pictures.length}:v]scale=${W}:${H},format=rgba[d]`);
+            fc.push(`[${last}][d]overlay=0:0:format=auto[o${k}]`);
+            last = `o${k}`;
+            k++;
+        }
         const cx = px(crop.x, W), cy = px(crop.y, H);
         fc.push(`[${last}]crop=${Math.max(1, Math.min(W - cx, px(crop.w, W)))}:${Math.max(1, Math.min(H - cy, px(crop.h, H)))}:${cx}:${cy}[out]`);
         args.push("-filter_complex", fc.join(";"), "-map", "[out]", "-frames:v", "1", "-update", "1", exportFile);
@@ -209,6 +279,30 @@ Scope {
         writeNow();
         exportError = "";
         exporting = true;
+        if (shapes.length === 0) {
+            drawingFile = "";
+            runExport();
+            return;
+        }
+        drawingFile = `${Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"}/frame-draw-${Date.now()}.png`;
+        drawingNeeded(drawingFile);
+    }
+
+    // The view saved the drawing (ok) or could not
+    function drawingReady(ok) {
+        if (!exporting || drawingFile === "" || exportProc.running)
+            return;
+        if (!ok) {
+            exporting = false;
+            drawingFile = "";
+            exportError = "the drawing could not be rendered";
+            Notifications.push({ app: "editor", glyph: "✗", title: "export failed", body: exportError });
+            return;
+        }
+        runExport();
+    }
+
+    function runExport() {
         exportProc.command = ["ffmpeg"].concat(exportArgs());
         exportProc.running = true;
     }
@@ -221,6 +315,10 @@ Scope {
         }
         onExited: code => {
             root.exporting = false;
+            if (root.drawingFile !== "") {
+                Quickshell.execDetached(["rm", "-f", "--", root.drawingFile]);
+                root.drawingFile = "";
+            }
             const file = root.exportFile;
             const name = file.slice(file.lastIndexOf("/") + 1);
             if (code !== 0) {
