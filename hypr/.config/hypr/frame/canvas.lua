@@ -33,6 +33,13 @@ local NEW_W, NEW_H = 0.55, 0.65
 
 local cams = {}
 local snapshot
+-- Fullscreen windows the view moved away from (overview, minimap, another window picked):
+-- they keep their spot on the canvas and go fullscreen again when the view comes back to
+-- them. address -> { ws = workspace id, cam = { x, y } it was fullscreen at }
+local parked = {}
+-- Addresses whose fullscreen ends right now: the camera leaves them where they are and
+-- the fullscreen event does not pull them into view
+local parking = {}
 
 -- ── Helpers ──────────────────────────────────────────────────
 
@@ -191,23 +198,55 @@ local function is_fullscreen(w)
 end
 
 -- Ends fullscreen on that workspace only, never on the focused window of another one;
--- the window with address `keep` stays as it is
+-- the window with address `keep` stays as it is. The window goes back to where it was on
+-- the canvas before fullscreen, however far the camera moves meanwhile, and is parked
+-- there to go fullscreen again when the view comes back.
 local function leave_fullscreen(ws, keep)
     if not (ws and ws.has_fullscreen) then
         return
     end
+    local c = cam_of(ws)
     for _, w in ipairs(hl.get_workspace_windows(ws) or {}) do
         if is_fullscreen(w) and w.address ~= keep then
+            local address, id, at = w.address, ws.id, { x = c.x, y = c.y }
+            parking[address] = true
             run(hl.dsp.window.fullscreen({ window = sel(w) }))
+            -- The floating geometry is back a moment later, in layout coordinates of the
+            -- camera it went fullscreen at (the camera does not move while it is)
+            hl.timer(function()
+                parking[address] = nil
+                local win = hl.get_window("address:" .. address)
+                if not win or not win.mapped or is_fullscreen(win) or not win.floating then
+                    return
+                end
+                local now = cam_of(win.workspace)
+                run(hl.dsp.window.move({
+                    x = math.floor(win.at.x + at.x - now.x),
+                    y = math.floor(win.at.y + at.y - now.y),
+                    window = "address:" .. address,
+                }))
+                parked[address] = { ws = id, cam = at }
+                snapshot()
+            end, { timeout = 150, type = "oneshot" })
         end
     end
+end
+
+-- A fullscreen window that is not being parked keeps the view where it is
+local function pinned(ws)
+    for _, w in ipairs(hl.get_workspace_windows(ws) or {}) do
+        if is_fullscreen(w) and not parking[w.address] then
+            return true
+        end
+    end
+    return false
 end
 
 -- Moves the camera of ws (default: the focused one) by dx, dy: every window of the
 -- workspace goes the other way
 local function pan(dx, dy, ws)
     ws = ws or active_ws()
-    if not ws or ws.has_fullscreen then
+    if not ws or pinned(ws) then
         return
     end
     dx, dy = math.floor(dx + 0.5), math.floor(dy + 0.5)
@@ -215,7 +254,9 @@ local function pan(dx, dy, ws)
         return
     end
     for _, w in ipairs(canvas_windows(ws)) do
-        run(hl.dsp.window.move({ x = -dx, y = -dy, relative = true, window = sel(w) }))
+        if not parking[w.address] then
+            run(hl.dsp.window.move({ x = -dx, y = -dy, relative = true, window = sel(w) }))
+        end
     end
     local c = cam_of(ws)
     c.x, c.y = c.x + dx, c.y + dy
@@ -236,7 +277,12 @@ end
 -- windows and the camera move at once, the state file and the maps follow on drag_done
 local function drag_by(name, dx, dy)
     local ws = ws_of_monitor(name)
-    if not ws or ws.has_fullscreen then
+    if not ws then
+        return
+    end
+    -- Dragging the desk away from a fullscreen window parks it
+    leave_fullscreen(ws)
+    if pinned(ws) then
         return
     end
     dx, dy = math.floor(dx + 0.5), math.floor(dy + 0.5)
@@ -244,7 +290,9 @@ local function drag_by(name, dx, dy)
         return
     end
     for _, w in ipairs(canvas_windows(ws)) do
-        run(hl.dsp.window.move({ x = -dx, y = -dy, relative = true, window = sel(w) }))
+        if not parking[w.address] then
+            run(hl.dsp.window.move({ x = -dx, y = -dy, relative = true, window = sel(w) }))
+        end
     end
     local c = cam_of(ws)
     c.x, c.y = c.x + dx, c.y + dy
@@ -332,10 +380,31 @@ local function focus_dir(name)
     end
 end
 
+-- A parked window (see leave_fullscreen) the view comes back to: the camera returns to
+-- where it was fullscreen and it fills the screen again
+local function come_back(w)
+    local p = parked[w.address]
+    local ws = w.workspace
+    if not p or not ws or ws.id ~= p.ws then
+        return false
+    end
+    parked[w.address] = nil
+    leave_fullscreen(ws)
+    local c = cam_of(ws)
+    pan(p.cam.x - c.x, p.cam.y - c.y, ws)
+    run(hl.dsp.focus({ window = sel(w) }))
+    run(hl.dsp.window.fullscreen({ window = sel(w) }))
+    snapshot()
+    return true
+end
+
 -- Picked in the overview: focus the window (on whichever monitor) and bring it to the middle
 local function pick(address)
     local w = find_window(address)
     if not w then
+        return
+    end
+    if come_back(w) then
         return
     end
     leave_fullscreen(w.workspace)
@@ -402,6 +471,9 @@ local function summon(address)
         end
     end
     if not target then
+        return
+    end
+    if come_back(w) then
         return
     end
     leave_fullscreen(target.ws)
@@ -751,6 +823,13 @@ on("window.fullscreen", function(w)
     if not address then
         return
     end
+    -- Fullscreen again (by hand too): not parked any more; parked ones the canvas places itself
+    if is_fullscreen(w) then
+        parked[address] = nil
+    end
+    if parking[address] then
+        return
+    end
     hl.timer(function()
         local win = hl.get_window("address:" .. address)
         if not win or not win.mapped or is_fullscreen(win) or not win.floating then
@@ -764,7 +843,12 @@ on("window.fullscreen", function(w)
     end, { timeout = 150, type = "oneshot" })
 end)
 
-on("window.close", snapshot)
+on("window.close", function(w)
+    if w and w.address then
+        parked[w.address] = nil
+    end
+    snapshot()
+end)
 on("window.active", snapshot)
 on("window.move_to_workspace", snapshot)
 on("workspace.active", snapshot)
