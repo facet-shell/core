@@ -236,16 +236,16 @@ Scope {
                         spacing: 6
 
                         Control {
-                            glyph: ""
+                            glyph: "\uf04a"
                             available: root.spotify?.canGoPrevious ?? false
                             onClicked: root.spotify.previous()
                         }
                         Control {
-                            glyph: root.spotify?.isPlaying ? "" : ""
+                            glyph: root.spotify?.isPlaying ? "\uf04c" : "\uf04b"
                             onClicked: root.spotify.togglePlaying()
                         }
                         Control {
-                            glyph: ""
+                            glyph: "\uf04e"
                             available: root.spotify?.canGoNext ?? false
                             onClicked: root.spotify.next()
                         }
