@@ -16,6 +16,11 @@ Scope {
     id: root
 
     property var state: ({ backend: "both", scaling: "fill", screens: {} })
+    // After the first read: only a change made while the shell runs holds the old picture
+    property bool ready: false
+
+    // frame-wallpaper ended a switch: "up" (the new backend draws), "died" or "timeout"
+    signal switched(string outcome)
 
     // Workshop items are folders, files have an extension
     function isFolder(path) {
@@ -54,10 +59,20 @@ Scope {
         onLoaded: {
             try {
                 root.state = Object.assign({ backend: "both", scaling: "fill", screens: {} }, JSON.parse(text()));
+                root.ready = true;
             } catch (e) {
                 // Half written; the next change brings a whole file
             }
         }
+    }
+
+    // "<ticket> <outcome>", written by frame-wallpaper once a switch has ended
+    FileView {
+        path: `${Quickshell.env("HOME")}/.local/state/frameshell/wallpaper.shown`
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.switched(text().trim().split(" ")[1] ?? "")
     }
 
     Variants {
@@ -68,8 +83,33 @@ Scope {
 
             required property ShellScreen modelData
             readonly property var picture: root.shownOn(modelData.name)
+            // A scene or video that replaces the picture needs seconds for its first frame;
+            // the picture stays up until then (the backend's layer is newer, so it comes on
+            // top of this one), and for good when the backend fails. Without this the screen
+            // showed the bare compositor background while the scene loaded. Set only from the
+            // handlers, not bound: a binding would drop the picture before it is held.
+            property string last: ""
+            property bool shown: false
+            property bool holding: false
 
-            visible: picture !== null
+            Component.onCompleted: {
+                last = picture ?? "";
+                shown = picture !== null;
+            }
+
+            onPictureChanged: {
+                if (picture !== null) {
+                    last = picture;
+                    holding = false;
+                } else {
+                    holding = shown && root.ready;
+                    if (holding)
+                        holdEnd.restart();
+                }
+                shown = picture !== null;
+            }
+
+            visible: picture !== null || holding
             screen: modelData
             color: Theme.bg
             exclusionMode: ExclusionMode.Ignore
@@ -83,9 +123,26 @@ Scope {
                 right: true
             }
 
+            Connections {
+                target: root
+                function onSwitched(outcome) {
+                    if (backdrop.holding && outcome === "up")
+                        backdrop.holding = false;
+                    else if (backdrop.holding)
+                        holdEnd.stop();
+                }
+            }
+
+            // In case the end of the switch is never reported (frame-wallpaper waits 30 s at most)
+            Timer {
+                id: holdEnd
+                interval: 32000
+                onTriggered: backdrop.holding = false
+            }
+
             Image {
                 anchors.fill: parent
-                source: (backdrop.picture ?? "") !== "" ? "file://" + backdrop.picture.split("/").map(encodeURIComponent).join("/") : ""
+                source: backdrop.last !== "" ? "file://" + backdrop.last.split("/").map(encodeURIComponent).join("/") : ""
                 fillMode: root.state.scaling === "fit" ? Image.PreserveAspectFit : Image.PreserveAspectCrop
                 // Decoded at screen size: an 8K picture would otherwise sit in memory whole
                 sourceSize.width: backdrop.width * (backdrop.modelData.devicePixelRatio || 1)

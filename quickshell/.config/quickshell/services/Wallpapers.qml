@@ -37,7 +37,11 @@ Singleton {
     }
 
     function apply(path, screen) {
-        run(["set", path, screen || "*"]);
+        const target = screen || "*";
+        // A pick that has not run yet is overridden by this one, so it is dropped instead of
+        // starting an engine that would be replaced right away
+        queue = queue.filter(args => !(args[0] === "set" && (target === "*" || args[2] === target)));
+        run(["set", path, target]);
         run(["state"]);
     }
 

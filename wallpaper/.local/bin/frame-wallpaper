@@ -20,8 +20,13 @@
 #   frame-wallpaper backend [both|mpv|image]  show or change the backend ("engine" means both)
 #   frame-wallpaper apply                     (re)start the backends from the state
 #   frame-wallpaper pause | resume            freeze the backends (the lockscreen does this) and
-#                                             let them run again (Wallpaper Engine is restarted)
+#                                             let them run again (Wallpaper Engine is restarted
+#                                             when it stands still afterwards)
 #   frame-wallpaper stop
+#
+# A switch keeps the old wallpaper until the new one has drawn its first frame, in the
+# background: set returns at once, and the next click makes a switch still waiting give way.
+# Timing of every switch goes to the log: ${XDG_STATE_HOME:-~/.local/state}/frameshell/wallpaper.log
 #
 # linux-wallpaperengine flags follow its README.
 set -euo pipefail
@@ -62,10 +67,15 @@ save() {
     mv "$tmp" "$STATE"
 }
 
+# Read, change and write under a lock of its own, so two changes at once never drop one
+# (a click in the app while the lockscreen resumes, say)
 update() {
-    local next
-    next="$(state | jq "$@")"
-    save <<<"$next"
+    mkdir -p "$STATE_DIR"
+    (
+        if command -v flock >/dev/null; then flock -w 10 9 || true; fi
+        next="$(state | jq "$@")"
+        save <<<"$next"
+    ) 9>>"$STATE_DIR/.wallpaper.lock"
 }
 
 # ── Wallpapers ────────────────────────────────────────────────
@@ -157,61 +167,164 @@ cmd_list() {
 
 # ── Backends ──────────────────────────────────────────────────
 
+RUN_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+PAUSED_MARK="$RUN_DIR/frame-wallpaper-paused"
+# Changes to the backends run one at a time under this lock (see take_ticket)
+LOCK="$RUN_DIR/frame-wallpaper.lock"
+TICKET="$RUN_DIR/frame-wallpaper.ticket"
+# A change that was saved but not shown yet (it gave way to a pause, say); resume shows it
+PENDING="$RUN_DIR/frame-wallpaper-pending"
+# "<ticket> <outcome>" once a switch has ended; the shell's backdrop keeps the previous
+# picture up until then, so a scene that is still loading has something under it
+SHOWN="$STATE_DIR/wallpaper.shown"
+# How long a new backend may take for its first frame. A big scene needs several seconds
+# (all assets, then the shaders) before it maps its layer.
+LAYER_WAIT_MS=30000
+LOCK_FD=""
+TICKET_ID=""
+
+# Timing lines in $LOG, so a slow switch can be told apart from a broken one
+log() {
+    mkdir -p "$STATE_DIR"
+    printf '%s %s\n' "$(date '+%F %T.%3N')" "$*" >>"$LOG"
+}
+
+now_ms() {
+    local t=${EPOCHREALTIME/[.,]/}
+    echo $((t / 1000))
+}
+
+# The engines write into the log as long as they run; it is cut in place (not replaced),
+# so their open file keeps working
+trim_log() {
+    [[ -f $LOG ]] || return 0
+    (($(stat -c %s "$LOG" 2>/dev/null || echo 0) > 2000000)) || return 0
+    local tmp
+    tmp="$(mktemp "$STATE_DIR/.wallpaper-log.XXXXXX")"
+    tail -n 3000 "$LOG" >"$tmp" && cat "$tmp" >"$LOG"
+    rm -f "$tmp"
+}
+
+# Every change (and pause, resume, stop) takes a ticket before it waits for the lock, and
+# the newest ticket wins: a switch still waiting for its engine gives up as soon as the next
+# click comes in, and applies that queued up meanwhile skip straight to the last one.
+# Without this a switch could run alongside another (the restart after an unlock and a
+# click, the one at login and a click), each taking the other's half-started engine for an
+# old one and ending it, which could leave nothing on screen.
+take_ticket() {
+    mkdir -p "$RUN_DIR"
+    TICKET_ID="$$.${EPOCHREALTIME/[.,]/}"
+    printf '%s\n' "$TICKET_ID" >"$TICKET.$$"
+    mv -f "$TICKET.$$" "$TICKET"
+}
+
+superseded() {
+    local t=""
+    { read -r t <"$TICKET"; } 2>/dev/null || true
+    [[ $t != "$TICKET_ID" ]]
+}
+
+# Held until this script and the settle step it leaves behind are done. The holder gives
+# way within a tenth of a second to a newer ticket, so the wait is short; the timeout is
+# only for a holder that hangs.
+take_lock() {
+    mkdir -p "$RUN_DIR"
+    exec {LOCK_FD}>>"$LOCK"
+    command -v flock >/dev/null || return 0
+    flock -w 60 "$LOCK_FD" || log "lock: still held after 60 s, going on without it"
+}
+
 monitors() {
     command -v hyprctl >/dev/null || die "needs a running Hyprland (hyprctl)"
     hyprctl monitors -j | jq -r '.[].name'
 }
 
-# All backend processes, old and new (the process name is cut to 15 characters, so the
-# command line is matched instead)
+# Backend processes of this user, by process name. The kernel cuts that name to 15
+# characters ("linux-wallpaper"); matching it instead of the command line keeps out
+# anything that only names the engine in its arguments (a git clone, an editor, a build).
+engine_pids() {
+    pgrep -u "$UID" -x linux-wallpaper 2>/dev/null || true
+}
+
+backend_pids() {
+    { pgrep -u "$UID" -x linux-wallpaper; pgrep -u "$UID" -x mpvpaper; } 2>/dev/null || true
+}
+
+# swaybg ran the still pictures before the shell drew them; an old one may still be up
 all_backend_pids() {
-    { pgrep -f '(^|/)linux-wallpaperengine( |$)'; pgrep -x mpvpaper; pgrep -x swaybg; } 2>/dev/null || true
+    { pgrep -u "$UID" -x linux-wallpaper; pgrep -u "$UID" -x mpvpaper; pgrep -u "$UID" -x swaybg; } 2>/dev/null || true
 }
 
-stop_backends() {
-    # Stopped while the screen was locked: they have to run to take the SIGTERM
-    local pid
-    for pid in $(all_backend_pids); do kill -CONT "$pid" 2>/dev/null || true; done
-    pkill -f '(^|/)linux-wallpaperengine( |$)' 2>/dev/null || true
-    pkill -x mpvpaper 2>/dev/null || true
-    # swaybg ran the still pictures before the shell drew them; an old one may still be up
-    pkill -x swaybg 2>/dev/null || true
-    sleep 0.2
-}
-
-# Ends the backends that ran before a switch: they stay up until the new ones draw on top
-# of them (same background layer, newer on top), so the switch is Hyprland's layer fade
-# instead of a gap with a bare background. The engine needs a moment for its shaders
-# before the first frame, so the wait is a little longer than the layer taking.
-stop_old_backends() {
-    local old=$1 pid i
-    [[ -n $old ]] || return 0
-    for ((i = 0; i < 40; i++)); do
-        new_layers_up "$old" && break
+# Ends processes for good: a stopped (paused) one only takes SIGTERM once it runs again,
+# and one that has not gone after 2 s (an engine stuck waiting for a frame) is killed
+end_pids() {
+    local pid i alive
+    (($#)) || return 0
+    for pid in "$@"; do kill -CONT "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; done
+    for ((i = 0; i < 20; i++)); do
+        alive=0
+        for pid in "$@"; do
+            if kill -0 "$pid" 2>/dev/null; then alive=1; break; fi
+        done
+        ((alive)) || return 0
         sleep 0.1
     done
-    sleep 0.6
-    # A paused (stopped) process only takes SIGTERM once it runs again
-    for pid in $old; do kill -CONT "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; done
-}
-
-# Every monitor has a background layer from a process that is not in the old set
-new_layers_up() {
-    local old=" $1 " monitor pid found
-    for monitor in $(monitors); do
-        found=0
-        for pid in $(hyprctl layers -j | jq -r --arg m "$monitor" '.[$m].levels["0"][]?.pid'); do
-            [[ $old == *" $pid "* ]] || { found=1; break; }
-        done
-        ((found)) || return 1
+    for pid in "$@"; do
+        if kill -KILL "$pid" 2>/dev/null; then log "killed $pid, it did not end on SIGTERM"; fi
     done
     return 0
 }
 
+stop_backends() {
+    # shellcheck disable=SC2046
+    end_pids $(all_backend_pids)
+}
+
+# Backends that were not there before the switch ($1 = " old pids "); under the lock
+# nothing else starts any, so these are this switch's own
+new_pids() {
+    local old=$1 pid out=""
+    for pid in $(all_backend_pids); do
+        [[ $old == *" $pid "* ]] || out+="$pid "
+    done
+    echo "$out"
+}
+
+# Pids that own a background layer. hyprctl lists a layer only once it is mapped, i.e.
+# once its first frame is there.
+layer_pids() {
+    hyprctl layers -j 2>/dev/null | jq -r '.[].levels["0"][]?.pid' 2>/dev/null || true
+}
+
+# Every monitor in $1 has a background layer of one of the pids in $2 (" pid pid ")
+layers_up() {
+    local monitors=$1 pids=$2 layers monitor pid ok
+    [[ -n ${monitors// /} ]] || return 0
+    layers="$(hyprctl layers -j 2>/dev/null)" || return 1
+    for monitor in $monitors; do
+        ok=0
+        for pid in $(jq -r --arg m "$monitor" '.[$m].levels["0"][]?.pid' <<<"$layers" 2>/dev/null); do
+            if [[ $pids == *" $pid "* ]]; then ok=1; break; fi
+        done
+        ((ok)) || return 1
+    done
+    return 0
+}
+
+mark_shown() {
+    printf '%s %s\n' "$TICKET_ID" "$1" >"$SHOWN.$$"
+    mv -f "$SHOWN.$$" "$SHOWN"
+}
+
 # Runs a backend in its own session so it outlives this script and the shell. The engine
 # repeats one harmless DBus complaint thousands of times, that line stays out of the log.
+# Nothing of the caller is passed on: not the lock (an engine holding it would block every
+# later change) and not its output (the app would wait for the end of it).
 spawn() {
-    setsid -f sh -c 'exec "$@" 2>&1 | grep --line-buffered -v "DBus error" >>"$0"' "$LOG" "$@" </dev/null
+    (
+        [[ -z $LOCK_FD ]] || exec {LOCK_FD}>&-
+        exec setsid -f sh -c 'exec "$@" 2>&1 | grep --line-buffered -v "DBus error" >>"$0"' "$LOG" "$@" </dev/null >>"$LOG" 2>&1
+    )
 }
 
 
@@ -254,30 +367,30 @@ start_on() {
     fi
 }
 
-backend_pids() {
-    { pgrep -f '(^|/)linux-wallpaperengine( |$)'; pgrep -x mpvpaper; } 2>/dev/null || true
-}
-
-PAUSED_MARK="${XDG_RUNTIME_DIR:-/tmp}/frame-wallpaper-paused"
-
 # Frozen while the screen is locked: nothing of it is visible behind the blurred snapshot.
 # The marker lets a freshly started shell know there is something to resume.
 cmd_pause() {
     local pid
+    take_ticket
+    take_lock
     for pid in $(backend_pids); do kill -STOP "$pid" 2>/dev/null || true; done
     touch "$PAUSED_MARK"
 }
 
-# Lets them run again. linux-wallpaperengine does not come back from a lock on its own
-# (the compositor stops asking it for frames and it waits forever), so it is started anew;
-# mpvpaper just continues.
+# Lets them run again; mpvpaper just continues. linux-wallpaperengine often does not come
+# back from a lock (the compositor stopped asking it for frames and it waits forever), but
+# starting it anew costs a whole scene load, so check_engines first looks whether it runs.
 cmd_resume() {
     local pid
+    take_ticket
+    take_lock
     for pid in $(backend_pids); do kill -CONT "$pid" 2>/dev/null || true; done
     rm -f "$PAUSED_MARK"
-    if pgrep -f '(^|/)linux-wallpaperengine( |$)' >/dev/null 2>&1; then
-        echo "$(date '+%F %T') - restarting linux-wallpaperengine after the lock" >>"$LOG"
-        cmd_apply
+    if [[ -e $PENDING ]]; then
+        log "resume: showing the change that waited for it"
+        apply_locked
+    elif [[ -n $(engine_pids) ]]; then
+        (check_engines) </dev/null >>"$LOG" 2>&1 &
     fi
 }
 
@@ -287,12 +400,127 @@ cmd_resume_if_paused() {
     return 0
 }
 
-cmd_apply() {
-    local settings backend monitor entry path kind
+# utime + stime of a process's main thread, in clock ticks
+main_ticks() {
+    local pid=$1 s
+    s="$(cat "/proc/$pid/task/$pid/stat" 2>/dev/null)" || return 1
+    s=${s##*) }
+    # shellcheck disable=SC2086
+    set -- $s
+    echo $((${12} + ${13}))
+}
+
+# A stuck engine's main thread waits for a frame and uses no CPU at all; a drawing one uses
+# some every second (also while it pauses for a fullscreen window, it polls then). Its other
+# threads (DBus, audio) keep going either way, so only the main thread tells. Runs in the
+# background, holding the lock.
+check_engines() {
+    local t0 pid ticks i engines stuck="" pids=()
+    local -A before=()
+    t0="$(now_ms)"
+    engines=" $(engine_pids | tr '\n' ' ') "
+    for pid in $(layer_pids); do
+        [[ $engines == *" $pid "* ]] || continue
+        ticks="$(main_ticks "$pid")" || continue
+        pids+=("$pid")
+        before[$pid]=$ticks
+    done
+    if ((${#pids[@]} == 0)); then
+        log "resume: no linux-wallpaperengine on screen, starting it anew"
+        superseded || apply_locked
+        return 0
+    fi
+    for ((i = 0; i < 20; i++)); do
+        superseded && return 0
+        sleep 0.1
+    done
+    for pid in "${pids[@]}"; do
+        ticks="$(main_ticks "$pid")" || { stuck+="$pid "; continue; }
+        ((ticks > ${before[$pid]})) || stuck+="$pid "
+    done
+    if [[ -z $stuck ]]; then
+        log "resume: linux-wallpaperengine runs on (checked in $(($(now_ms) - t0)) ms)"
+        return 0
+    fi
+    log "resume: linux-wallpaperengine ${stuck% } stands still after the pause, starting it anew"
+    superseded || apply_locked
+}
+
+# Waits until the new backends draw on every screen they were started on ($2), then ends
+# the old ones ($1): both sit on the background layer, the newer on top, so the switch is
+# Hyprland's layer fade instead of a gap with a bare background. A new backend that dies or
+# never draws is ended and the old wallpaper stays, instead of nothing. Runs in the
+# background, holding the lock, so the app does not wait for it; a newer change makes it
+# give way at once.
+settle() {
+    local old=$1 waiting=$2 t0=$3 new="" seen=0 outcome=timeout ms
+    while :; do
+        new="$(new_pids "$old")"
+        ms=$(($(now_ms) - t0))
+        if layers_up "$waiting" " $new "; then outcome=up; break; fi
+        if superseded; then outcome=superseded; break; fi
+        if [[ -n ${new// /} ]]; then
+            seen=1
+        elif ((seen || ms > 3000)); then
+            # Gone, or never came up at all (the binary is missing, say)
+            outcome=died
+            break
+        fi
+        ((ms < LAYER_WAIT_MS)) || break
+        sleep 0.1
+    done
+    # shellcheck disable=SC2086
+    case $outcome in
+        up)
+            [[ -z ${waiting// /} ]] || log "switch: new layer up after $ms ms"
+            # Hyprland fades the new layer in; the old one goes once it is covered
+            sleep 0.6
+            end_pids $old
+            ;;
+        superseded)
+            # What is on screen stays until the next change has its own backends up (it
+            # takes them for old ones); what still loads would only slow that one down
+            log "switch: superseded after $ms ms${new:+, ending the new backends that were still loading (${new% })}"
+            end_pids $new
+            touch "$PENDING"
+            return 0
+            ;;
+        died)
+            log "switch: the new backend ended after $ms ms without a frame (its output is above), the old wallpaper stays"
+            ;;
+        timeout)
+            if [[ -n ${old// /} ]]; then
+                log "switch: no new layer after $ms ms, ending the new backends (${new% }), the old wallpaper stays"
+                end_pids $new
+            else
+                log "switch: no new layer after $ms ms, nothing older to keep, so it is left running"
+            fi
+            ;;
+    esac
+    mark_shown "$outcome"
+    log "switch: done after $(($(now_ms) - t0)) ms ($outcome)"
+}
+
+# What a screen gets, for the log
+describe() {
+    local path=$1 kind=$2 title=""
+    if [[ -d $path ]]; then
+        title="$(jq -r '.title // ""' "$path/project.json" 2>/dev/null)" || title=""
+        echo "$kind ${path##*/}${title:+ \"$title\"}"
+    else
+        echo "$kind ${path##*/}"
+    fi
+}
+
+# Starts the backends for the state; the caller holds the lock
+apply_locked() {
+    local settings backend monitor entry path kind old t0 summary waiting="" shown=()
+    t0="$(now_ms)"
+    rm -f "$PENDING"
+    trim_log
     settings="$(state)"
     backend="$(jq -r .backend <<<"$settings")"
-    local old
-    old="$(all_backend_pids | tr '\n' ' ')"
+    old=" $(all_backend_pids | tr '\n' ' ') "
     for monitor in $(monitors); do
         # A wallpaper set for this screen wins over the one for all screens
         entry="$(jq -c --arg m "$monitor" '.screens[$m] // .screens["*"] // {}' <<<"$settings")"
@@ -300,14 +528,36 @@ cmd_apply() {
         kind="$(jq -r '.kind // ""' <<<"$entry")"
         if [[ -n $path && -e $path ]] && allowed "$backend" "$path" "$kind"; then
             start_on "$monitor" "$path" "$kind" "$settings"
+            if [[ -d $path || $kind == video ]]; then waiting+="$monitor "; fi
+            shown+=("$monitor $(describe "$path" "$kind")")
         else
-            # Nothing set, the file is gone, or the backend cannot show it: plain background
             # Nothing set, the file is gone, or the backend cannot show it: the shell shows
             # the theme background there (wallpapers/Backdrop.qml)
-            :
+            shown+=("$monitor plain background")
         fi
     done
-    stop_old_backends "$old"
+    summary="$(printf '%s, ' "${shown[@]}")"
+    log "switch: ${summary%, }; old backends:${old% }"
+    (settle "$old" "$waiting" "$t0") </dev/null >>"$LOG" 2>&1 &
+}
+
+cmd_apply() {
+    take_ticket
+    take_lock
+    if superseded; then
+        # The newer one reads the state when it runs, this change included
+        touch "$PENDING"
+        log "apply: skipped, a newer change follows"
+        return 0
+    fi
+    apply_locked
+}
+
+cmd_stop() {
+    take_ticket
+    take_lock
+    rm -f "$PENDING"
+    stop_backends
 }
 
 cmd_set() {
@@ -378,6 +628,6 @@ case "${1:-}" in
     pause) cmd_pause ;;
     resume) cmd_resume ;;
     resume-if-paused) cmd_resume_if_paused ;;
-    stop) stop_backends ;;
+    stop) cmd_stop ;;
     *) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//' ;;
 esac
