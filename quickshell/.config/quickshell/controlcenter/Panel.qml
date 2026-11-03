@@ -345,20 +345,29 @@ Item {
                     onClicked: Toggles.setGameMode(!Toggles.gameMode)
                 }
                 ToggleTile {
-                    // Same state as the mute button of the mic fader
+                    // Same state as the mute button of the mic fader; without a GoXLR the
+                    // default microphone's mute, like the mic row in the app mixer
+                    readonly property bool onFader: GoXLR.fader("mic") !== null
+
                     glyph: ""
                     title: "mic mute"
-                    checked: GoXLR.fader("mic")?.muted ?? false
-                    available: GoXLR.fader("mic") !== null
-                    onClicked: GoXLR.setMuted("mic", !checked)
+                    checked: onFader ? GoXLR.fader("mic").muted : Audio.defaultSource?.audio?.muted ?? false
+                    available: onFader || Audio.defaultSource !== null
+                    onClicked: {
+                        if (onFader)
+                            GoXLR.setMuted("mic", !checked);
+                        else
+                            Audio.toggleMute(Audio.defaultSource);
+                    }
                 }
             }
         }
 
-        // GoXLR faders: levels follow the hardware, mutes work from here
+        // GoXLR faders: levels follow the hardware, mutes work from here. Without a GoXLR
+        // the section only leads to the app mixer, which then mixes the plain devices
         Section {
             index: 2
-            label: "goxlr faders"
+            label: GoXLR.available || Audio.goxlr ? "goxlr faders" : "sound"
             implicitHeight: faderColumn.implicitHeight + 36
 
             TuiButton {
@@ -385,8 +394,10 @@ Item {
 
                 Label {
                     visible: !GoXLR.available
-                    text: "goxlr-utility is not running"
+                    Layout.fillWidth: true
+                    text: Audio.goxlr ? "goxlr-utility is not running" : "no goxlr · volume and device per app in the app mixer"
                     color: Theme.muted
+                    elide: Text.ElideRight
                 }
 
                 // The list only changes when a fader gets another channel; level and mute
