@@ -131,7 +131,8 @@ Item {
 
         implicitWidth: 26
         implicitHeight: 24
-        border.color: hovered ? Theme.border : "transparent"
+        // Framed like the other buttons, the accent while hovered
+        border.color: hovered ? Theme.primary : Theme.border
 
         Text {
             anchors.centerIn: parent

@@ -195,6 +195,11 @@ Item {
         back: "back", b: "back", rewind: "back", rw: "back",
         shuffle: "shuffle", repeat: "repeat", loop: "repeat", like: "like", heart: "like"
     })
+    // One icon per control (Nerd Font: Font Awesome and Material Design), so the rows differ
+    readonly property var spotifyGlyphs: ({
+        play: "\uf04b", pause: "\uf04c", toggle: String.fromCodePoint(0xF040E), next: "\uf051", prev: "\uf048",
+        forward: "\uf04e", back: "\uf04a", jump: "\uf017", shuffle: "\uf074", repeat: "\uf01e", like: "\uf004"
+    })
     readonly property var spotifyLabels: ({
         play: "play", pause: "pause", toggle: "play / pause", next: "next track", prev: "previous track",
         forward: "forward", back: "back", jump: "jump to", shuffle: "shuffle on / off", repeat: "repeat: off → all → track", like: "like / unlike"
@@ -236,7 +241,7 @@ Item {
             kind: "spotify-control", action, seconds,
             title: `${spotifyLabels[action]}${time}`,
             desc: `now: ${nowPlaying()}`,
-            category: "control", glyph: action === "next" ? "»" : action === "prev" ? "«" : action === "like" ? "♥" : "▶",
+            category: "control", glyph: spotifyGlyphs[action] ?? "\uf04b", glyphFont: Theme.iconFont,
             tint: Theme.primary, icon: "",
             rows: [["via", Spotify.via], ["playing", nowPlaying()]]
         };

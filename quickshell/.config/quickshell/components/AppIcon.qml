@@ -9,6 +9,8 @@ Item {
     // Icon theme name ("spotify") or a path/URL to an image; both work
     property string icon
     property string glyph
+    // The letter tile's font; icon glyphs (Nerd Font) take Theme.iconFont
+    property string glyphFont: Theme.font
     property color tint: Theme.primary
     property int size: 40
 
@@ -35,7 +37,7 @@ Item {
             anchors.centerIn: parent
             text: root.glyph
             color: Theme.bg
-            font.family: Theme.font
+            font.family: root.glyphFont
             font.pixelSize: root.size * 0.45
             font.weight: Font.Medium
         }

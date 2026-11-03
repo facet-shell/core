@@ -704,6 +704,7 @@ Item {
                                     visible: !row.passive
                                     icon: row.modelData.icon
                                     glyph: row.modelData.glyph
+                                    glyphFont: row.modelData.glyphFont ?? Theme.font
                                     tint: row.modelData.tint
                                 }
 
@@ -779,6 +780,7 @@ Item {
                             size: 76
                             icon: root.selected?.icon ?? ""
                             glyph: root.selected?.glyph ?? ""
+                            glyphFont: root.selected?.glyphFont ?? Theme.font
                             tint: root.selected?.tint ?? Theme.primary
                         }
 
