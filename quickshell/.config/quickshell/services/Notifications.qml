@@ -2,7 +2,9 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Services.Notifications
+import Quickshell.Wayland
 import qs.config
 
 // Every notification: desktop ones over D-Bus (this shell is the notification daemon)
@@ -10,6 +12,7 @@ import qs.config
 // everything also lands in `history` for the bell in the bar.
 //
 // Entry: { uid, app, title, body, image, glyph, kind ("normal" | "voice" | "call" | "alarm" | "mini"),
+//   rule (which of Config.notifyRules decides, e.g. "dc.call"; none: the shell's own notices, always shown),
 //   critical, timeout (ms, 0 = stays until handled), time, actions: [{ id, label, style }],
 //   notification (D-Bus object or null), onAction(id), callChannel,
 //   logged (false = popup only, e.g. a missed-call notice whose call is already in the history) }
@@ -55,6 +58,7 @@ Singleton {
             const critical = n.urgency === NotificationUrgency.Critical;
             root.push({
                 app: (n.appName || "app").toLowerCase(),
+                rule: "sys.apps",
                 title: n.summary,
                 body: n.body,
                 image: n.image || n.appIcon || "",
@@ -78,6 +82,39 @@ Singleton {
         return entry.kind === "call" || entry.kind === "alarm";
     }
 
+    // "always", "game" or "never" for a kind of notification
+    function ruleFor(kind) {
+        return kind ? (Config.notifyRules[kind] ?? "always") : "always";
+    }
+
+    // Whether the rule lets it on screen right now (game mode, the bell); for popups that
+    // are not notifications, like the Spotify song popup
+    function allows(kind, urgent) {
+        const rule = ruleFor(kind);
+        if (rule === "never")
+            return false;
+        if (rule === "game" && Toggles.gameMode && Config.gameModeSilent)
+            return false;
+        return !Toggles.silent || urgent === true;
+    }
+
+    // A message from an app that may be open (Config.discordMessagesWhen and steamMessagesWhen):
+    // false when you are looking at it already
+    function messageShows(when, appId) {
+        const active = (ToplevelManager.activeToplevel?.appId ?? "").toLowerCase() === appId;
+        return when === "always" || (when === "unfocused" ? !active : !active && !onScreen(appId));
+    }
+
+    // The app has a window on a workspace some screen shows right now (Discord on the second
+    // screen counts, Discord on another workspace does not)
+    function onScreen(appId) {
+        const id = appId.toLowerCase();
+        const shown = Hyprland.monitors.values.flatMap(m => [m.activeWorkspace?.id, m.specialWorkspace?.id])
+            .filter(w => w !== undefined && w !== 0);
+        return Hyprland.toplevels.values.some(t => shown.includes(t.workspace?.id)
+            && String(t.wayland?.appId ?? t.lastIpcObject?.class ?? "").toLowerCase() === id);
+    }
+
     function push(entry) {
         const full = Object.assign({
             uid: nextUid++,
@@ -98,11 +135,16 @@ Singleton {
         if (!entry.glyph)
             full.glyph = (full.title || full.app).charAt(0).toUpperCase();
 
+        // Turned off under the rules: not even in the bell
+        if (!full.critical && ruleFor(full.rule) === "never")
+            return;
+
         if (full.logged)
             history = [full].concat(history).slice(0, 50);
 
-        // Silent keeps everything but calls, alarms and critical ones off the screen
-        if (Toggles.silent && !full.critical && !root.urgent(full)) {
+        // "not in game" while playing, and the bell (silent) for everything but calls and
+        // alarms, wait in the history; critical ones always show
+        if (!full.critical && !allows(full.rule, root.urgent(full))) {
             missed += 1;
             return;
         }

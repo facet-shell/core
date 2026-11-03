@@ -3,7 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
+import qs.config
 
 // Unix socket the Vencord plugin (vencord/plugins/shellBridge) connects to.
 // One JSON object per line in both directions.
@@ -32,9 +32,6 @@ Singleton {
     readonly property string path: `${Quickshell.env("XDG_RUNTIME_DIR")}/qs-discord.sock`
     property var clients: []
     readonly property bool connected: clients.length > 0
-
-    // Vesktop is the focused window (messages show up there, so no popup for them)
-    readonly property bool discordFocused: (ToplevelManager.activeToplevel?.appId ?? "").toLowerCase() === "vesktop"
 
     // For the launcher (d): DMs and friends, and who "d reply" goes to
     property var contacts: []
@@ -75,6 +72,7 @@ Singleton {
             return;
         Notifications.push({
             app: "discord · call",
+            rule: "dc.call",
             kind: "mini",
             logged: false,
             timeout: 8000,
@@ -104,11 +102,12 @@ Singleton {
     function handle(event) {
         switch (event.type) {
         case "message":
-            // You are in Discord already: the message is on screen, no popup needed
-            if (root.discordFocused)
+            // You are in Discord already: the message is on screen (Config.discordMessagesWhen)
+            if (!Notifications.messageShows(Config.discordMessagesWhen, "vesktop"))
                 break;
             Notifications.push({
                 app: "discord",
+                rule: event.kind === "server" ? "dc.mention" : "dc.dm",
                 title: root.messageTitle(event),
                 body: event.content,
                 image: event.avatar ?? "",
@@ -123,6 +122,7 @@ Singleton {
             // Your own channel: just the news. A watched channel: offer to join
             Notifications.push({
                 app: event.watched ? "discord · watching" : "discord · voice",
+                rule: "dc.voice",
                 kind: "voice",
                 title: `${event.user} ${event.action === "join" ? "joined" : "left"} ${event.channel}`,
                 body: `${event.count} in the channel`,
@@ -135,6 +135,7 @@ Singleton {
             // Stage/voice events can be joined directly, external ones only opened
             Notifications.push({
                 app: "discord · event",
+                rule: "dc.event",
                 kind: "voice",
                 title: `${event.name} started`,
                 body: [event.guild, event.channel || event.location].filter(Boolean).join(" · "),
@@ -148,6 +149,7 @@ Singleton {
             if (event.state === "ringing")
                 Notifications.push({
                     app: "discord · call",
+                    rule: "dc.call",
                     kind: "call",
                     timeout: 0,
                     title: `${event.caller} is calling`,
@@ -166,6 +168,7 @@ Singleton {
         case "self":
             Notifications.push({
                 app: "discord",
+                rule: "dc.self",
                 kind: "mini",
                 timeout: 2500,
                 glyph: event.muted || event.deafened ? "✕" : "✓",
@@ -186,6 +189,7 @@ Singleton {
         case "sent":
             Notifications.push({
                 app: "discord",
+                rule: "dc.self",
                 kind: "mini",
                 logged: false,
                 timeout: event.ok ? 2500 : 6000,

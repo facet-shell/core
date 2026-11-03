@@ -21,7 +21,8 @@ FocusScope {
     property string section: "look"
     readonly property var sections: [
         ["look", "look", "theme, layout, wallpaper"],
-        ["shell", "shell", "lock, notifications, weather"],
+        ["shell", "shell", "lock, weather"],
+        ["notifications", "notifications", "what shows when, look, Spotify"],
         ["launcher", "launcher", "search, Claude, files, timers"],
         ["games", "games", "game mode"],
         ["sound", "sound", "output and input"],
@@ -282,6 +283,77 @@ FocusScope {
             active: !flag.on
             tint: Theme.danger
             onClicked: Config.set(flag.key, false)
+        }
+    }
+
+    // One of a few values; options: [[value, label], …]
+    component ChoiceSetting: Setting {
+        id: choice
+
+        property var options: []
+
+        Repeater {
+            model: choice.options
+            delegate: Action {
+                required property var modelData
+                text: modelData[1]
+                active: Config[choice.key] === modelData[0]
+                onClicked: Config.set(choice.key, modelData[0])
+            }
+        }
+    }
+
+    // A notification rule (Config.notifyRules): always, not while playing, never
+    component RuleSetting: Setting {
+        id: ruleRow
+
+        property string kind: ""
+        readonly property string value: Config.notifyRules[kind] ?? "always"
+
+        Action {
+            text: "always"
+            active: ruleRow.value === "always"
+            tint: Theme.ok
+            onClicked: Config.setRule(ruleRow.kind, "always")
+        }
+        Action {
+            text: "not in game"
+            active: ruleRow.value === "game"
+            tint: Theme.warn
+            onClicked: Config.setRule(ruleRow.kind, "game")
+        }
+        Action {
+            text: "never"
+            active: ruleRow.value === "never"
+            tint: Theme.danger
+            onClicked: Config.setRule(ruleRow.kind, "never")
+        }
+    }
+
+    // Where a popup sits: six corners and edges as arrows, like the screen they stand for
+    component PositionSetting: Setting {
+        id: place
+
+        readonly property var spots: [["top-left", "↖"], ["top", "↑"], ["top-right", "↗"], ["bottom-left", "↙"], ["bottom", "↓"], ["bottom-right", "↘"]]
+
+        hint: String(Config[key] ?? "").replace("-", " ")
+
+        GridLayout {
+            columns: 3
+            columnSpacing: 4
+            rowSpacing: 4
+
+            Repeater {
+                model: place.spots
+                delegate: Action {
+                    required property var modelData
+                    implicitWidth: 34
+                    implicitHeight: 26
+                    text: modelData[1]
+                    active: Config[place.key] === modelData[0]
+                    onClicked: Config.set(place.key, modelData[0])
+                }
+            }
         }
     }
 
@@ -554,8 +626,163 @@ FocusScope {
                             zero: "never"
                         }
 
-                        Heading { text: "notifications" }
+                        Heading { text: "weather" }
 
+                        TextSetting {
+                            key: "weatherLocation"
+                            title: "city"
+                            hint: "empty: guessed from your connection"
+                            placeholder: "e.g. Berlin"
+                        }
+                        NumberSetting {
+                            key: "weatherInterval"
+                            title: "update every"
+                            min: 5
+                            max: 120
+                            step: 5
+                            unit: " min"
+                        }
+                    }
+
+                    // ── notifications ──
+                    ColumnLayout {
+                        visible: root.section === "notifications"
+                        Layout.fillWidth: true
+                        spacing: 14
+
+                        Heading { text: "what shows when · always gets through game mode, not in game waits in the bell" }
+
+                        Heading { text: "system"; color: Theme.secondary }
+                        RuleSetting {
+                            kind: "sys.apps"
+                            title: "apps"
+                            hint: "downloads, mail, anything that sends one over D-Bus"
+                        }
+                        Setting {
+                            title: "critical ones"
+                            hint: "battery low, or the app says it is urgent"
+
+                            Text {
+                                text: "always · can't be turned off"
+                                color: Theme.muted
+                                font.family: Theme.font
+                                font.pixelSize: 13
+                            }
+                        }
+                        RuleSetting {
+                            kind: "sys.gamemode"
+                            title: "game mode on and off"
+                        }
+
+                        Heading { text: "discord"; color: Theme.secondary }
+                        RuleSetting {
+                            kind: "dc.call"
+                            title: "calls"
+                            hint: "someone rings you"
+                        }
+                        RuleSetting {
+                            kind: "dc.dm"
+                            title: "direct and group messages"
+                        }
+                        RuleSetting {
+                            kind: "dc.mention"
+                            title: "server mentions"
+                            hint: "@you or a reply in a server"
+                        }
+                        ChoiceSetting {
+                            key: "discordMessagesWhen"
+                            title: "messages while Discord is open"
+                            hint: "anyway, or not while you look at it: focused, or on any screen"
+                            options: [["always", "anyway"], ["unfocused", "not focused"], ["hidden", "on no screen"]]
+                        }
+                        RuleSetting {
+                            kind: "dc.voice"
+                            title: "voice channels"
+                            hint: "people join or leave yours or one you watch"
+                        }
+                        RuleSetting {
+                            kind: "dc.event"
+                            title: "server events"
+                            hint: "a stage or event starts"
+                        }
+                        RuleSetting {
+                            kind: "dc.self"
+                            title: "mute and deafen"
+                            hint: "your own keys, and DMs sent from the launcher"
+                        }
+
+                        Heading { text: "steam"; color: Theme.secondary }
+                        RuleSetting {
+                            kind: "st.invite"
+                            title: "game invites"
+                            hint: "a friend invites you, with join"
+                        }
+                        RuleSetting {
+                            kind: "st.request"
+                            title: "friend requests"
+                        }
+                        RuleSetting {
+                            kind: "st.message"
+                            title: "messages"
+                        }
+                        ChoiceSetting {
+                            key: "steamMessagesWhen"
+                            title: "messages while Steam is open"
+                            hint: "anyway, or not while you look at it: focused, or on any screen"
+                            options: [["always", "anyway"], ["unfocused", "not focused"], ["hidden", "on no screen"]]
+                        }
+                        RuleSetting {
+                            kind: "st.friends"
+                            title: "friends online or playing"
+                        }
+                        RuleSetting {
+                            kind: "st.achievement"
+                            title: "achievements"
+                            hint: "Steam shows its own in the game"
+                        }
+                        RuleSetting {
+                            kind: "st.download"
+                            title: "downloads ready"
+                        }
+
+                        Heading { text: "spotify"; color: Theme.secondary }
+                        RuleSetting {
+                            kind: "sp.song"
+                            title: "next song popup"
+                            hint: "not when you skipped from the card under the bar"
+                        }
+
+                        Setting {
+                            title: "all rules"
+                            hint: "the bell in the bar still holds back everything but calls and alarms"
+
+                            Action {
+                                text: "back to default"
+                                available: Config.isSet("notifyRules")
+                                onClicked: Config.reset("notifyRules")
+                            }
+                        }
+
+                        Heading { text: "popups · look and place" }
+
+                        PositionSetting {
+                            key: "notificationPosition"
+                            title: "where"
+                        }
+                        ChoiceSetting {
+                            key: "notificationStyle"
+                            title: "style"
+                            hint: "card: frame, picture, buttons · line: one line · minimal: who and what"
+                            options: [["card", "card"], ["line", "line"], ["minimal", "minimal"]]
+                        }
+                        NumberSetting {
+                            key: "notificationWidth"
+                            title: "width"
+                            min: 340
+                            max: 680
+                            step: 20
+                            unit: " px"
+                        }
                         NumberSetting {
                             key: "notificationTimeout"
                             title: "stay on screen"
@@ -573,21 +800,33 @@ FocusScope {
                             max: 6
                         }
 
-                        Heading { text: "weather" }
+                        Heading { text: "Spotify popup" }
 
-                        TextSetting {
-                            key: "weatherLocation"
-                            title: "city"
-                            hint: "empty: guessed from your connection"
-                            placeholder: "e.g. Berlin"
+                        PositionSetting {
+                            key: "spotifyPosition"
+                            title: "where"
+                        }
+                        ChoiceSetting {
+                            key: "spotifyFormat"
+                            title: "format"
+                            hint: "wide: cover beside the song · tall: big cover on top · strip: one thin line"
+                            options: [["wide", "wide"], ["tall", "tall"], ["strip", "strip"]]
                         }
                         NumberSetting {
-                            key: "weatherInterval"
-                            title: "update every"
-                            min: 5
-                            max: 120
-                            step: 5
-                            unit: " min"
+                            key: "spotifySize"
+                            title: "size"
+                            min: 0.6
+                            max: 1.6
+                            step: 0.1
+                            unit: "×"
+                        }
+                        NumberSetting {
+                            key: "spotifySeconds"
+                            title: "stays"
+                            hint: "longer while the mouse is on it"
+                            min: 2
+                            max: 20
+                            unit: " s"
                         }
                     }
 
@@ -660,7 +899,7 @@ FocusScope {
                         BoolSetting {
                             key: "gameModeSilent"
                             title: "quiet while playing"
-                            hint: "popups stay away, calls and alarms still come through"
+                            hint: "what is set to \"not in game\" under notifications waits; off: everything shows"
                         }
                         BoolSetting {
                             key: "barOverFullscreen"

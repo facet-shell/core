@@ -8,9 +8,12 @@ import qs.components
 import qs.config
 import qs.services
 
-// Popup top left whenever Spotify starts another song: cover, title, artist, album,
-// progress and controls. Hides after six seconds and stays while the mouse is on it.
-// Not for songs skipped from the media card under the bar.
+// Popup whenever Spotify starts another song: cover, title, artist, album, progress and
+// controls. Where and how it looks is in the settings (Config.spotifyPosition, spotifyFormat:
+// wide, tall or strip, spotifySize, spotifySeconds); like the notifications the cover sits on
+// the side it is on, and in the middle there is none and the text is centered. It stays while
+// the mouse is on it, waits for the notification rule "sp.song" (not while playing by
+// default), and does not show for songs skipped from the media card under the bar.
 // No like button: Spotify does not offer liking over MPRIS.
 Scope {
     id: root
@@ -19,6 +22,14 @@ Scope {
     property string lastTrack: ""
     property bool open: false
     property real remaining: 1
+
+    readonly property string side: Config.side(Config.spotifyPosition)
+    readonly property bool top: Config.atTop(Config.spotifyPosition)
+    readonly property bool mirrored: side === "right"
+    readonly property string format: ["wide", "tall", "strip"].includes(Config.spotifyFormat) ? Config.spotifyFormat : "wide"
+    readonly property real size: Math.max(0.6, Math.min(1.6, Config.spotifySize))
+    readonly property bool showCover: side !== "center"
+    readonly property int textAlign: side === "right" ? Text.AlignRight : side === "center" ? Text.AlignHCenter : Text.AlignLeft
 
     property real shown: open ? 1 : 0
     Behavior on shown {
@@ -29,7 +40,7 @@ Scope {
         return player ? `${player.trackTitle}|${player.trackArtist}` : "";
     }
 
-    function format(seconds) {
+    function formatTime(seconds) {
         const s = Math.max(0, Math.floor(seconds || 0));
         return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
     }
@@ -41,6 +52,9 @@ Scope {
         lastTrack = key;
         // Skipped from the card under the bar: you are already looking at it
         if (Spotify.cardOpen)
+            return;
+        // Game mode and the bell, as the rules say
+        if (!Notifications.allows("sp.song"))
             return;
         open = true;
         hideAnimation.restart();
@@ -65,7 +79,7 @@ Scope {
         property: "remaining"
         from: 1
         to: 0
-        duration: 6000
+        duration: Math.max(2, Config.spotifySeconds) * 1000
         paused: cardHover.hovered
         onFinished: root.open = false
     }
@@ -113,25 +127,36 @@ Scope {
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "qs-media-popup"
+        // Neither left nor right: the layer shell centers it
         anchors {
-            top: true
-            left: true
+            top: root.top
+            bottom: !root.top
+            left: root.side === "left"
+            right: root.side === "right"
         }
         margins {
             top: 66
+            bottom: 14
             left: 14
+            right: 14
         }
-        implicitWidth: 420
-        implicitHeight: card.height + 16
+        // The card is scaled from its top left corner, the window takes the scaled size
+        implicitWidth: Math.ceil(card.width * root.size)
+        implicitHeight: Math.ceil(card.height * root.size) + 16
 
         Item {
             id: card
 
             y: 12
-            width: 420
-            height: layout.implicitHeight + 36
+            width: root.format === "tall" ? 260 : root.format === "strip" ? 380 : 420
+            height: root.format === "strip" ? strip.implicitHeight + 16 : layout.implicitHeight + 36
+            scale: root.size
+            transformOrigin: Item.TopLeft
             opacity: root.shown
-            transform: Translate { x: -24 * (1 - root.shown) }
+            transform: Translate {
+                x: root.side === "right" ? 24 * (1 - root.shown) : root.side === "left" ? -24 * (1 - root.shown) : 0
+                y: root.side === "center" ? (root.top ? -16 : 16) * (1 - root.shown) : 0
+            }
 
             HoverHandler {
                 id: cardHover
@@ -145,28 +170,34 @@ Scope {
 
             Frame {
                 anchors.fill: parent
-                label: "now playing · spotify"
-                borderColor: Theme.primary
+                label: root.format === "strip" ? "" : "now playing · spotify"
+                labelAlign: root.side
+                borderColor: root.format === "strip" ? Theme.border : Theme.primary
                 padding: 0
             }
 
+            // ── wide and tall ──
             GridLayout {
                 id: layout
 
+                visible: root.format !== "strip"
                 anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 16; rightMargin: 16; topMargin: 24 }
-                columns: 2
+                // wide: cover beside the song; tall: cover on top
+                columns: root.format === "tall" || !root.showCover ? 1 : 2
+                layoutDirection: root.mirrored ? Qt.RightToLeft : Qt.LeftToRight
                 columnSpacing: 14
                 rowSpacing: 10
 
                 Rectangle {
-                    implicitWidth: 72
-                    implicitHeight: 72
+                    visible: root.showCover
+                    Layout.preferredWidth: root.format === "tall" ? card.width - 32 : 72
+                    Layout.preferredHeight: Layout.preferredWidth
                     color: Theme.surface2
 
                     Image {
                         anchors.fill: parent
                         source: root.spotify?.trackArtUrl ?? ""
-                        sourceSize: Qt.size(144, 144)
+                        sourceSize: Qt.size(root.format === "tall" ? 480 : 144, root.format === "tall" ? 480 : 144)
                         fillMode: Image.PreserveAspectCrop
                     }
                 }
@@ -177,6 +208,7 @@ Scope {
 
                     Label {
                         Layout.fillWidth: true
+                        horizontalAlignment: root.textAlign
                         text: root.spotify?.trackTitle ?? ""
                         color: Theme.text
                         font.pixelSize: 17
@@ -184,11 +216,13 @@ Scope {
                     }
                     Label {
                         Layout.fillWidth: true
+                        horizontalAlignment: root.textAlign
                         text: root.spotify?.trackArtist ?? ""
                         color: Theme.secondary
                     }
                     Label {
                         Layout.fillWidth: true
+                        horizontalAlignment: root.textAlign
                         text: root.spotify?.trackAlbum ?? ""
                         color: Theme.frame
                         font.pixelSize: 13
@@ -196,33 +230,38 @@ Scope {
 
                     Row {
                         Layout.topMargin: 6
+                        Layout.alignment: root.side === "right" ? Qt.AlignRight
+                            : root.side === "center" || root.format === "tall" ? Qt.AlignHCenter
+                            : Qt.AlignLeft
                         spacing: 6
 
                         Control {
-                            glyph: ""
+                            glyph: ""
                             available: root.spotify?.canGoPrevious ?? false
                             onClicked: root.spotify.previous()
                         }
                         Control {
-                            glyph: root.spotify?.isPlaying ? "" : ""
+                            glyph: root.spotify?.isPlaying ? "" : ""
                             onClicked: root.spotify.togglePlaying()
                         }
                         Control {
-                            glyph: ""
+                            glyph: ""
                             available: root.spotify?.canGoNext ?? false
                             onClicked: root.spotify.next()
                         }
                     }
                 }
 
+                // Time runs left to right on every side
                 RowLayout {
-                    Layout.columnSpan: 2
+                    Layout.columnSpan: layout.columns
                     Layout.fillWidth: true
+                    layoutDirection: Qt.LeftToRight
                     spacing: 12
 
                     Label {
                         Layout.preferredWidth: 40
-                        text: root.format(root.spotify?.position)
+                        text: root.formatTime(root.spotify?.position)
                         color: Theme.muted
                         font.pixelSize: 12
                     }
@@ -235,17 +274,61 @@ Scope {
                     Label {
                         Layout.preferredWidth: 40
                         horizontalAlignment: Text.AlignRight
-                        text: root.format(root.spotify?.length)
+                        text: root.formatTime(root.spotify?.length)
                         color: Theme.muted
                         font.pixelSize: 12
                     }
                 }
             }
 
-            // Time until the popup hides
+            // ── strip: one thin line ──
+            RowLayout {
+                id: strip
+
+                visible: root.format === "strip"
+                anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; leftMargin: 10; rightMargin: 10 }
+                layoutDirection: root.mirrored ? Qt.RightToLeft : Qt.LeftToRight
+                spacing: 10
+
+                Rectangle {
+                    visible: root.showCover
+                    implicitWidth: 30
+                    implicitHeight: 30
+                    color: Theme.surface2
+
+                    Image {
+                        anchors.fill: parent
+                        source: root.spotify?.trackArtUrl ?? ""
+                        sourceSize: Qt.size(60, 60)
+                        fillMode: Image.PreserveAspectCrop
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 5
+
+                    Label {
+                        Layout.fillWidth: true
+                        horizontalAlignment: root.textAlign
+                        text: `${root.spotify?.trackTitle ?? ""}  ·  ${root.spotify?.trackArtist ?? ""}`
+                        color: Theme.text
+                        font.pixelSize: 13
+                    }
+                    Meter {
+                        Layout.fillWidth: true
+                        implicitHeight: 2
+                        value: (root.spotify?.length ?? 0) > 0 ? root.spotify.position / root.spotify.length : 0
+                        fill: Theme.primary
+                    }
+                }
+            }
+
+            // Time until the popup hides, shrinking toward the side it sits on
             Rectangle {
-                anchors { left: parent.left; bottom: parent.bottom }
+                y: parent.height - height
                 width: parent.width * root.remaining
+                x: root.side === "right" ? parent.width - width : root.side === "center" ? (parent.width - width) / 2 : 0
                 height: 2
                 color: Theme.frame
             }

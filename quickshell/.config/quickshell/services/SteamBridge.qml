@@ -3,7 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
+import qs.config
 
 // Unix socket the Millennium plugin (steam/.local/share/millennium/plugins/frameshell) connects to. Steam's own
 // toasts are switched off while the plugin is connected; it sends them here instead.
@@ -31,9 +31,6 @@ Singleton {
     // Steam turned its own toasts off for us (from "hello")
     property bool suppressing: false
 
-    // Steam is the focused window: its chat shows the message already
-    readonly property bool steamFocused: (ToplevelManager.activeToplevel?.appId ?? "").toLowerCase() === "steam"
-
     // Brings Steam to the front (Hyprland does the focusing, the plugin the navigation)
     function focusWindow() {
         Quickshell.execDetached(["sh", "-c", "hyprctl dispatch 'hl.dsp.focus({ window = \"class:steam\" })' | grep -q ok || steam"]);
@@ -59,10 +56,12 @@ Singleton {
             suppressing = event.suppressing === true;
             break;
         case "message":
-            if (root.steamFocused)
+            // You are in Steam's chat already (Config.steamMessagesWhen)
+            if (!Notifications.messageShows(Config.steamMessagesWhen, "steam"))
                 break;
             Notifications.push({
                 app: "steam",
+                rule: "st.message",
                 title: event.chat ? `${event.from} · ${event.chat}` : event.from,
                 body: event.text ?? "",
                 image: event.avatar ?? "",
@@ -75,6 +74,7 @@ Singleton {
         case "friend":
             Notifications.push({
                 app: "steam · friends",
+                rule: "st.friends",
                 kind: "mini",
                 timeout: 4000,
                 glyph: event.state === "ingame" ? "▶" : "●",
@@ -89,6 +89,7 @@ Singleton {
             if (event.kind === "game")
                 Notifications.push({
                     app: "steam · invite",
+                    rule: "st.invite",
                     timeout: 0,
                     title: `${event.from} invites you`,
                     body: event.text || "to a game",
@@ -104,6 +105,7 @@ Singleton {
             else
                 Notifications.push({
                     app: "steam · friends",
+                    rule: "st.request",
                     title: `friend request from ${event.from}`,
                     body: "",
                     image: event.avatar ?? "",
@@ -114,6 +116,7 @@ Singleton {
         case "achievement":
             Notifications.push({
                 app: event.game ? `steam · ${event.game}` : "steam",
+                rule: "st.achievement",
                 glyph: "★",
                 title: `achievement · ${event.name}`,
                 body: event.description ?? "",
@@ -123,6 +126,7 @@ Singleton {
         case "download":
             Notifications.push({
                 app: "steam · downloads",
+                rule: "st.download",
                 kind: "mini",
                 timeout: 6000,
                 glyph: "✓",

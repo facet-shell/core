@@ -37,7 +37,6 @@ Singleton {
     // Set while a game turned game mode on, so its end turns it off again (and not one you
     // switched on by hand); what it changed comes back afterwards
     property bool autoGame: false
-    property bool silentBefore: false
     property string profileBefore: ""
 
     // A short wait, so a launcher window that flashes past or a game restarting itself
@@ -59,10 +58,9 @@ Singleton {
 
     function startGame() {
         autoGame = true;
+        // What still shows while playing is up to the notification rules (Config.notifyRules),
+        // so the bell stays as it was
         setGameMode(true);
-        silentBefore = silent;
-        if (Config.gameModeSilent)
-            silent = true;
         if (Config.goxlrGameProfile !== "" && GoXLR.available) {
             profileBefore = GoXLR.profile;
             GoXLR.loadProfile(Config.goxlrGameProfile);
@@ -71,6 +69,7 @@ Singleton {
         wallpapers("pause");
         Notifications.push({
             app: "game mode",
+            rule: "sys.gamemode",
             kind: "mini",
             logged: false,
             timeout: 3000,
@@ -83,7 +82,6 @@ Singleton {
     function endGame() {
         autoGame = false;
         setGameMode(false);
-        silent = silentBefore;
         if (profileBefore !== "") {
             GoXLR.loadProfile(profileBefore);
             profileBefore = "";
@@ -91,6 +89,7 @@ Singleton {
         wallpapers("resume");
         Notifications.push({
             app: "game mode",
+            rule: "sys.gamemode",
             kind: "mini",
             logged: false,
             timeout: 2500,

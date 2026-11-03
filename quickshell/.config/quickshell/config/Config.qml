@@ -76,6 +76,71 @@ Singleton {
     readonly property int notificationTimeout: user.notificationTimeout ?? 5000
     readonly property int notificationsMax: user.notificationsMax ?? 3
 
+    // ── Notifications ────────────────────────────────────────
+
+    // What shows when, per kind: "always" (through game mode too), "game" (not while game mode
+    // is on: it waits in the bell) or "never". Critical ones always show; the bell (silent)
+    // still holds back everything but calls and alarms. shell.json keeps only what you changed.
+    readonly property var notifyRuleDefaults: ({
+        "sys.apps": "game",
+        "sys.gamemode": "always",
+        "dc.call": "always",
+        "dc.dm": "always",
+        "dc.mention": "always",
+        "dc.voice": "game",
+        "dc.event": "game",
+        "dc.self": "always",
+        "st.invite": "always",
+        "st.request": "always",
+        "st.message": "always",
+        "st.friends": "game",
+        "st.achievement": "game",
+        "st.download": "game",
+        "sp.song": "game"
+    })
+    readonly property var notifyRules: Object.assign({}, notifyRuleDefaults, user.notifyRules ?? {})
+
+    function setRule(kind, value) {
+        const next = Object.assign({}, user.notifyRules ?? {});
+        if (value === notifyRuleDefaults[kind])
+            delete next[kind];
+        else
+            next[kind] = value;
+        if (Object.keys(next).length === 0)
+            reset("notifyRules");
+        else
+            set("notifyRules", next);
+    }
+
+    // Messages from Discord or Steam while the app is open: "always" (even while you look at
+    // it), "unfocused" (not while it is the focused window) or "hidden" (only while it is on
+    // no screen, so not with Discord on the second screen either)
+    readonly property string discordMessagesWhen: user.discordMessagesWhen ?? "hidden"
+    readonly property string steamMessagesWhen: user.steamMessagesWhen ?? "hidden"
+
+    // Where the popups sit: top-left, top, top-right, bottom-left, bottom, bottom-right.
+    // The icon goes to the side they sit on; in the middle there is none and the text is centered.
+    readonly property string notificationPosition: user.notificationPosition ?? "top-right"
+    // card (frame, picture, buttons, time left), line (one line) or minimal (who and what)
+    readonly property string notificationStyle: user.notificationStyle ?? "card"
+    readonly property int notificationWidth: user.notificationWidth ?? 460
+
+    // The Spotify popup: same positions; wide (cover beside the song), tall (big cover on
+    // top) or strip (one thin line); size as a factor; seconds it stays
+    readonly property string spotifyPosition: user.spotifyPosition ?? "top-left"
+    readonly property string spotifyFormat: user.spotifyFormat ?? "wide"
+    readonly property real spotifySize: user.spotifySize ?? 1
+    readonly property int spotifySeconds: user.spotifySeconds ?? 6
+
+    // "left", "right" or "center" of a position, and whether it is at the top
+    function side(position) {
+        return position.endsWith("left") ? "left" : position.endsWith("right") ? "right" : "center";
+    }
+
+    function atTop(position) {
+        return !position.startsWith("bottom");
+    }
+
     // The bar's update count also covers frameshell (the CLI and the modules, compared with
     // their GitHub repos). false: neither checked nor shown; packages still are.
     readonly property bool frameUpdates: user.frameUpdates ?? true
@@ -134,7 +199,8 @@ Singleton {
     readonly property bool gameModeAuto: user.gameModeAuto ?? true
     // Other games, by window class as `hyprctl clients` shows it (exact names, no patterns)
     readonly property var gameClasses: user.gameClasses ?? []
-    // Popups stay quiet while playing (calls and alarms still get through)
+    // While playing, the notification rules hold back what is set to "not in game";
+    // false: everything shows as if no game ran
     readonly property bool gameModeSilent: user.gameModeSilent ?? true
     // GoXLR profile to load while playing, the one before comes back after; empty: none
     readonly property string goxlrGameProfile: user.goxlrGameProfile ?? ""

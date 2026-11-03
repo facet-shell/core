@@ -20,8 +20,15 @@ Item {
     property color lineColor: borderColor
     Behavior on lineColor { ColorAnimation { duration: Theme.anim.fast } }
 
-    readonly property real gapStart: label === "" ? width : 14
-    readonly property real gapEnd: label === "" ? width : 14 + labelText.implicitWidth + 16
+    // Where the label sits in the top line: "left", "right" or "center"
+    property string labelAlign: "left"
+
+    readonly property real gapWidth: labelText.implicitWidth + 16
+    readonly property real gapStart: label === "" ? width
+        : labelAlign === "right" ? width - 14 - gapWidth
+        : labelAlign === "center" ? (width - gapWidth) / 2
+        : 14
+    readonly property real gapEnd: label === "" ? width : gapStart + gapWidth
 
     Rectangle {
         x: 1
@@ -42,7 +49,7 @@ Item {
     Text {
         id: labelText
         visible: root.label !== ""
-        x: 22
+        x: root.gapStart + 8
         y: -height / 2
         text: root.label
         color: root.labelColor
