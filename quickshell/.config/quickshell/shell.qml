@@ -5,6 +5,7 @@ import Quickshell.Services.Mpris
 import qs.bar
 import qs.canvas
 import qs.controlcenter
+import qs.draw
 import qs.editor
 import qs.gallery
 import qs.hotkeys
@@ -185,5 +186,11 @@ ShellRoot {
         id: settings
         onWallpapersRequested: wallpapers.show()
         onKeyboardRequested: keyboard.show()
+    }
+
+    // Super+P: draw on the screen, again hides it; the drawing stays (and moves with the
+    // infinite canvas). Gone while locked.
+    DrawOverlay {
+        hidden: lock.active
     }
 }

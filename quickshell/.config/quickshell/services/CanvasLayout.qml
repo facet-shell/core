@@ -18,6 +18,10 @@ Singleton {
     property bool enabled: false
     property var monitors: []
     property var windows: []
+    // Drag steps sent since canvas.lua last wrote the map (it writes once a drag ends), per
+    // monitor name: { x, y } to add to that monitor's view, so the screen drawing (draw/)
+    // moves with the windows while the canvas is dragged
+    property var pending: ({})
 
     readonly property var focused: monitors.find(m => m.focused) ?? monitors[0] ?? null
 
@@ -128,6 +132,9 @@ Singleton {
     // Dragging empty canvas: small steps while the mouse moves, one write-out at the end
     function dragBy(dx, dy, monitor) {
         run(`frame_canvas.drag_by("${String(monitor).replace(/[^\w-]/g, "")}", ${Math.round(dx)}, ${Math.round(dy)})`);
+        const name = String(monitor);
+        const p = pending[name] ?? { x: 0, y: 0 };
+        pending = Object.assign({}, pending, { [name]: { x: p.x + Math.round(dx), y: p.y + Math.round(dy) } });
     }
 
     function dragDone() {
@@ -172,6 +179,8 @@ Singleton {
                 const data = JSON.parse(text());
                 root.monitors = data.monitors ?? [];
                 root.windows = data.windows ?? [];
+                // The cameras in the map include the steps sent so far
+                root.pending = {};
             } catch (e) {
                 // Half written; the next change brings a whole one
             }

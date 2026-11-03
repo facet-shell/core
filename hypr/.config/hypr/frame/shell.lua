@@ -85,6 +85,10 @@ take("SUPER + SHIFT + S", shell("screenshot", "region"), { description = "frame 
 take("SUPER + CTRL + S", shell("screenshot", "screen"), { description = "frame shell · screenshot: whole screen" })
 -- Screen recording: the same picker; the same key (or the dot in the bar) stops it
 take("SUPER + SHIFT + R", shell("screenshot", "record"), { description = "frame shell · screen recording: start or stop" })
+-- Drawing on the screen (quickshell/draw): Super+P again hides it and gives the screen back,
+-- the drawing stays for next time; take() drops the distro's own Super+P first
+take("SUPER + P", shell("draw", "toggle"), { description = "frame shell · draw on the screen (again: hide)" })
+take("SUPER + SHIFT + P", shell("draw", "clear"), { description = "frame shell · draw: clear the drawing" })
 
 -- Windows over each other (on the canvas nothing keeps them apart): Alt+Tab goes to the next
 -- window and brings it up, Super+Alt+B sends the active one to the back. Super+Alt+S puts the
