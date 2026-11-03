@@ -18,7 +18,11 @@ FocusScope {
     readonly property string tool: `${Quickshell.env("HOME")}/.local/bin/frame-media`
     property string picturesDir: `${Quickshell.env("HOME")}/Pictures`
     readonly property string shotsDir: `${picturesDir}/screenshots`
-    readonly property var folders: [shotsDir, Recorder.folder].concat(extraFolders)
+    // Paint's pages (Editor.newPicture)
+    readonly property string paintDir: `${picturesDir}/paintings`
+    readonly property var folders: [shotsDir, paintDir, Recorder.folder].concat(extraFolders)
+    // "new picture" asks for the paper in place
+    property bool choosePaper: false
     // Folders dropped on the app, kept in media.json
     property var extraFolders: []
     readonly property string thumbDir: `${Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache"}/frameshell/media`
@@ -401,6 +405,36 @@ FocusScope {
                     trashProc.command = [root.tool, "trash"].concat(root.leftovers);
                     trashProc.running = true;
                 }
+            }
+
+            // Paint: an empty page in the picture editor, the paper asked in place
+            Action {
+                visible: !root.choosePaper
+                text: "new picture"
+                tint: Theme.primary
+                onClicked: root.choosePaper = true
+            }
+            Label {
+                visible: root.choosePaper
+                text: "paper:"
+                color: Theme.muted
+            }
+            Repeater {
+                model: root.choosePaper ? Editor.papers : []
+                delegate: Action {
+                    required property string modelData
+                    text: modelData
+                    tint: Theme.primary
+                    onClicked: {
+                        root.choosePaper = false;
+                        Editor.newPicture(modelData);
+                    }
+                }
+            }
+            Action {
+                visible: root.choosePaper
+                text: "no"
+                onClicked: root.choosePaper = false
             }
 
             Action {

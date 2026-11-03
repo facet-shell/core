@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=frameshell paint
+Comment=An empty page in the picture editor: pen, shapes, text, ruler
+Exec=qs ipc call editor paint
+Icon=applications-graphics
+Keywords=draw;paint;sketch;picture;
+Categories=Graphics;
+Terminal=false
+Actions=white;clear;
+
+[Desktop Action white]
+Name=White paper
+Exec=qs ipc call editor paintOn white
+
+[Desktop Action clear]
+Name=Transparent paper
+Exec=qs ipc call editor paintOn clear

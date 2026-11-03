@@ -5,8 +5,9 @@ import qs.config
 import qs.services
 
 // The editor as its own window, for a video (EditorView: cuts, blur boxes, pictures, levels per
-// channel) or a picture (ImageEditorView: blur boxes, pictures, crop). Opened through the Editor
-// service: "edit" on a notification, the media app, or `qs ipc call editor open <file>`.
+// channel) or a picture (ImageEditorView: blur boxes, pictures, drawing, crop). Opened through
+// the Editor service: "edit" on a notification, the media app, or `qs ipc call editor open <file>`;
+// `qs ipc call editor paint` (or paintOn white|clear) opens an empty page.
 // The views come in through a Loader, so without Qt Multimedia (qt6-multimedia-ffmpeg) only
 // the video editor is missing and it says so.
 Scope {
@@ -48,7 +49,8 @@ Scope {
         id: window
 
         visible: root.open
-        title: Editor.isVideo(root.file) ? "frameshell · video editor" : "frameshell · picture editor"
+        title: Editor.isVideo(root.file) ? "frameshell · video editor"
+            : root.file.includes("/paintings/") ? "frameshell · paint" : "frameshell · picture editor"
         implicitWidth: 1480
         implicitHeight: 940
         color: Theme.bg
@@ -90,6 +92,16 @@ Scope {
 
         function open(path: string): void {
             Editor.open(path);
+        }
+
+        // Paint: an empty page in the theme's background (`new` is a word JavaScript keeps)
+        function paint(): void {
+            Editor.newPicture("theme");
+        }
+
+        // paper: theme, white or clear
+        function paintOn(paper: string): void {
+            Editor.newPicture(paper);
         }
 
         function close(): void {
