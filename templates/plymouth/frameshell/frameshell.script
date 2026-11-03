@@ -65,14 +65,6 @@ bar_track.SetPosition(bar_x, bar_y, 10);
 bar_fill = Sprite(fill.Scale(1, 2));
 bar_fill.SetPosition(bar_x, bar_y, 11);
 
-fun progress_callback(duration, progress) {
-    w = Math.Int(bar_w * progress);
-    if (w < 1)
-        w = 1;
-    bar_fill.SetImage(fill.Scale(w, 2));
-}
-Plymouth.SetBootProgressFunction(progress_callback);
-
 # Status line under it: what is happening, or the password prompt
 status = Sprite();
 status.SetPosition(bar_x, box_y + 84, 10);
@@ -95,10 +87,42 @@ else
     state_text = "starting";
 say(state_text, dim);
 
+# Booting has a real progress (plymouth estimates it from the last boots); shutting down
+# and restarting have none, so a short piece of the line sweeps back and forth instead
+fun progress_callback(duration, progress) {
+    w = Math.Int(bar_w * progress);
+    if (w < 1)
+        w = 1;
+    bar_fill.SetImage(fill.Scale(w, 2));
+}
+
+sweep_w = Math.Int(bar_w / 5);
+global.tick = 0;
+fun sweep_callback() {
+    global.tick++;
+    # 0 to 1 and back in three seconds, at plymouth's 50 frames a second
+    t = (global.tick % 150) / 75;
+    if (t > 1)
+        t = 2 - t;
+    bar_fill.SetX(bar_x + Math.Int((bar_w - sweep_w) * t));
+}
+
+if (mode == "shutdown" || mode == "reboot") {
+    bar_fill.SetImage(fill.Scale(sweep_w, 2));
+    Plymouth.SetRefreshFunction(sweep_callback);
+} else {
+    Plymouth.SetBootProgressFunction(progress_callback);
+}
+
 fun message_callback(text) {
     say(text, dim);
 }
-Plymouth.SetMessageFunction(message_callback);
+Plymouth.SetDisplayMessageFunction(message_callback);
+
+fun hide_message_callback(text) {
+    say(state_text, dim);
+}
+Plymouth.SetHideMessageFunction(hide_message_callback);
 
 fun password_callback(prompt, bullets) {
     dots = "";
