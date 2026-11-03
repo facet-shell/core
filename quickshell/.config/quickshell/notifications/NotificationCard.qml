@@ -6,9 +6,9 @@ import qs.config
 import qs.services
 
 // One notification popup, in the look Config.notificationStyle picks: card (the TUI frame
-// with picture and buttons), line (one line) or minimal (who and what). It mirrors the side
-// the popups sit on: the icon on that side, the text aligned to it; in the middle there is
-// no icon and everything is centered. A bar counts down the timeout and pauses while
+// with picture and buttons), line (one line) or minimal (who and what). On either side the
+// icon is on the left and the text left-aligned, the card only slides in from its side; in
+// the middle there is no icon and everything is centered. A bar counts down the timeout and pauses while
 // hovered; calls pulse green and stay until answered.
 Item {
     id: root
@@ -23,8 +23,10 @@ Item {
     readonly property string look: Config.notificationStyle === "minimal" && entry.timeout === 0 && entry.actions.length > 0
         ? "line" : Config.notificationStyle
     readonly property bool showIcon: side !== "center"
-    readonly property bool mirrored: side === "right"
-    readonly property int textAlign: side === "right" ? Text.AlignRight : side === "center" ? Text.AlignHCenter : Text.AlignLeft
+    // Where the content lines up: left on both sides, centered in the middle
+    readonly property string align: side === "center" ? "center" : "left"
+    readonly property bool mirrored: false
+    readonly property int textAlign: align === "center" ? Text.AlignHCenter : Text.AlignLeft
 
     readonly property color accent: entry.critical ? Theme.danger
         : isCall ? Theme.ok
@@ -152,7 +154,7 @@ Item {
         anchors.fill: parent
         visible: root.look === "card"
         label: `${root.entry.app} · ${Notifications.ago(root.entry.time)}`
-        labelAlign: root.side
+        labelAlign: root.align
         borderColor: root.isCall ? root.lineColor : root.accent
         labelColor: root.labelColor
         padding: 0
@@ -183,7 +185,7 @@ Item {
                 Layout.fillWidth: true
                 // Room for the close button on its side (both sides in the middle, so it stays centered)
                 Layout.rightMargin: root.isCall || root.mirrored ? 0 : 30
-                Layout.leftMargin: !root.isCall && root.side !== "left" ? 30 : 0
+                Layout.leftMargin: !root.isCall && root.align !== "left" ? 30 : 0
                 horizontalAlignment: root.textAlign
                 text: root.entry.title
                 color: Theme.text
@@ -208,7 +210,7 @@ Item {
 
             Row {
                 Layout.topMargin: 10
-                Layout.alignment: root.side === "right" ? Qt.AlignRight : root.side === "center" ? Qt.AlignHCenter : Qt.AlignLeft
+                Layout.alignment: root.align === "right" ? Qt.AlignRight : root.align === "center" ? Qt.AlignHCenter : Qt.AlignLeft
                 visible: root.entry.actions.length > 0
                 layoutDirection: root.mirrored ? Qt.RightToLeft : Qt.LeftToRight
                 spacing: 8
@@ -238,9 +240,9 @@ Item {
     Rectangle {
         visible: root.look === "line"
         x: root.mirrored ? parent.width - width : 0
-        width: root.side === "center" ? parent.width : 3
-        height: root.side === "center" ? 2 : parent.height
-        y: root.side === "center" ? parent.height - height : 0
+        width: root.align === "center" ? parent.width : 3
+        height: root.align === "center" ? 2 : parent.height
+        y: root.align === "center" ? parent.height - height : 0
         color: root.isCall ? root.lineColor : root.entry.critical ? Theme.danger : Theme.primary
     }
 
@@ -342,7 +344,7 @@ Item {
         visible: root.entry.timeout > 0 && root.look !== "minimal"
         y: parent.height - height
         width: parent.width * root.remaining
-        x: root.side === "right" ? parent.width - width : root.side === "center" ? (parent.width - width) / 2 : 0
+        x: root.align === "right" ? parent.width - width : root.align === "center" ? (parent.width - width) / 2 : 0
         height: 2
         color: root.entry.critical ? Theme.danger : Theme.primary
     }
