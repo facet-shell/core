@@ -367,13 +367,44 @@ Scope {
                     Muted { text: root.keymap; visible: root.keymap !== "" }
                     Bracket { text: "]"; visible: root.keymap !== "" }
 
-                    // Package updates (services/Updates.qml): only there when there are some;
-                    // click runs them in Ghostty
-                    Bracket { text: "─["; visible: Updates.total > 0 || Updates.updating }
-                    Label {
-                        visible: Updates.total > 0 || Updates.updating
-                        text: Updates.updating ? "updating …" : Updates.aurCount > 0 ? `↑ ${Updates.total} (${Updates.aurCount} aur)` : `↑ ${Updates.total}`
-                        color: Updates.updating ? Theme.muted : Theme.warn
+                    // Package and frameshell updates (services/Updates.qml): only there when
+                    // there are some; hovering names the frameshell repos that are behind.
+                    // Click runs them in Ghostty (only `frame update` when no package waits).
+                    Bracket { text: "─["; visible: updatesItem.visible }
+                    Item {
+                        id: updatesItem
+                        visible: Updates.total > 0 || Updates.frameCount > 0 || Updates.updating
+                        implicitWidth: updatesRow.implicitWidth
+                        implicitHeight: updatesRow.implicitHeight
+
+                        HoverHandler {
+                            id: updatesHover
+                        }
+
+                        Row {
+                            id: updatesRow
+
+                            Label {
+                                visible: Updates.updating
+                                text: "updating …"
+                                color: Theme.muted
+                            }
+                            Label {
+                                visible: !Updates.updating && Updates.total > 0
+                                text: Updates.aurCount > 0 ? `↑ ${Updates.total} (${Updates.aurCount} aur)` : `↑ ${Updates.total}`
+                                color: Theme.warn
+                            }
+                            Muted {
+                                visible: !Updates.updating && Updates.total > 0 && Updates.frameCount > 0
+                                text: " · "
+                            }
+                            Label {
+                                visible: !Updates.updating && Updates.frameCount > 0
+                                text: updatesHover.hovered ? `frame ${Updates.frameList.map(r => r.name).join(" ")}`
+                                    : Updates.total > 0 ? `frame ${Updates.frameCount}` : `↑ frame ${Updates.frameCount}`
+                                color: Theme.warn
+                            }
+                        }
 
                         MouseArea {
                             anchors.fill: parent
@@ -381,7 +412,7 @@ Scope {
                             onClicked: Updates.update()
                         }
                     }
-                    Bracket { text: "]"; visible: Updates.total > 0 || Updates.updating }
+                    Bracket { text: "]"; visible: updatesItem.visible }
 
                     // Bell: notifications missed while "silent" was on; click for the history
                     Bracket { text: "─[" }

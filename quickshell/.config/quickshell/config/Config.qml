@@ -76,6 +76,10 @@ Singleton {
     readonly property int notificationTimeout: user.notificationTimeout ?? 5000
     readonly property int notificationsMax: user.notificationsMax ?? 3
 
+    // The bar's update count also covers frameshell (the CLI and the modules, compared with
+    // their GitHub repos). false: neither checked nor shown; packages still are.
+    readonly property bool frameUpdates: user.frameUpdates ?? true
+
     // goxlr-utility HTTP API (fader levels and mutes)
     readonly property string goxlrApi: user.goxlrApi ?? "http://localhost:14564"
     // App mixer routes → PipeWire device description, as shown by `wpctl status`.

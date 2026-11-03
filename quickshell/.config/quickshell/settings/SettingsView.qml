@@ -817,7 +817,14 @@ FocusScope {
 
                         Setting {
                             title: "updates"
-                            hint: Updates.total > 0 ? `${Updates.total} packages waiting (${Updates.aurCount} from the AUR), then frame update` : "everything is up to date"
+                            hint: {
+                                const parts = [];
+                                if (Updates.total > 0)
+                                    parts.push(`${Updates.total} packages waiting (${Updates.aurCount} from the AUR)`);
+                                if (Updates.frameCount > 0)
+                                    parts.push(`frameshell: ${Updates.frameList.map(r => `${r.name} ${r.from} → ${r.to}`).join(", ")}`);
+                                return parts.length > 0 ? `${parts.join("; ")}, then frame update` : "everything is up to date";
+                            }
 
                             Action {
                                 text: Updates.updating ? "updating…" : "update"
@@ -825,6 +832,11 @@ FocusScope {
                                 available: !Updates.updating
                                 onClicked: Updates.update()
                             }
+                        }
+                        BoolSetting {
+                            key: "frameUpdates"
+                            title: "frameshell updates"
+                            hint: "show frameshell updates in the bar: the CLI and modules behind GitHub"
                         }
 
                         Setting {
