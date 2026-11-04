@@ -3,12 +3,15 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Bluetooth
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.config
 
 // State behind the control center toggles, and the game mode that switches itself on
-// while a game runs (Config.gameModeAuto).
+// while you are in a game (Config.gameModeAuto): on the gaming workspace, or with a game
+// focused fullscreen; off again on another workspace, in another app or with the game
+// in a window.
 Singleton {
     id: root
 
@@ -46,26 +49,39 @@ Singleton {
 
     readonly property var games: ToplevelManager.toplevels.values.filter(t => root.isGame(t.appId, t.title))
     readonly property bool gameRunning: games.length > 0
-    readonly property string gameTitle: games.length > 0 ? (games[0].title || games[0].appId) : ""
+
+    // Where you are decides, not what runs somewhere: the gaming workspace on the focused
+    // screen, or a game that has the focus and is fullscreen (in a window it is off)
+    // focusedMonitor comes with the first focus event; until then hyprctl's word
+    readonly property HyprlandMonitor focusedMonitor: Hyprland.focusedMonitor
+        ?? Hyprland.monitors.values.find(m => m.lastIpcObject?.focused === true) ?? null
+    readonly property bool onGamingWorkspace: focusedMonitor?.activeWorkspace?.name === "gaming"
+    readonly property Toplevel focusedWindow: ToplevelManager.activeToplevel
+    readonly property bool gameFocused: focusedWindow !== null && focusedWindow.fullscreen
+        && isGame(focusedWindow.appId, focusedWindow.title)
+    readonly property bool inGame: onGamingWorkspace || gameFocused
+    readonly property string gameTitle: gameFocused ? (focusedWindow.title || focusedWindow.appId)
+        : games.length > 0 ? (games[0].title || games[0].appId) : ""
 
     // Set while a game turned game mode on, so its end turns it off again (and not one you
     // switched on by hand); what it changed comes back afterwards
     property bool autoGame: false
     property string profileBefore: ""
 
-    // A short wait, so a launcher window that flashes past or a game restarting itself
-    // does not flip everything twice
-    onGameRunningChanged: gameSettle.restart()
+    // A short wait, so passing through a workspace, a launcher window that flashes past or a
+    // game going fullscreen in steps does not flip everything twice. Game mode you switched
+    // on by hand (autoGame false) is left alone.
+    onInGameChanged: gameSettle.restart()
 
     Timer {
         id: gameSettle
-        interval: 2500
+        interval: 500
         onTriggered: {
             if (!Config.gameModeAuto)
                 return;
-            if (root.gameRunning && !root.autoGame && !root.gameMode)
+            if (root.inGame && !root.autoGame && !root.gameMode)
                 root.startGame();
-            else if (!root.gameRunning && root.autoGame)
+            else if (!root.inGame && root.autoGame)
                 root.endGame();
         }
     }
