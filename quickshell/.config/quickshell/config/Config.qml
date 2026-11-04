@@ -217,7 +217,7 @@ Singleton {
     readonly property int spotifyPort: user.spotifyPort ?? 48931
 
     // Web search (?): engine without a shortcut, and the shortcuts. %s is the search text.
-    readonly property string searchDefault: user.searchDefault ?? "ddg"
+    readonly property string searchDefault: user.searchDefault ?? "g"
     readonly property var searchEngines: user.searchEngines ?? ({
         g: ["Google", "https://www.google.com/search?q=%s"],
         ddg: ["DuckDuckGo", "https://duckduckgo.com/?q=%s"],
