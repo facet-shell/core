@@ -255,6 +255,11 @@ Singleton {
     readonly property bool gameModeSilent: user.gameModeSilent ?? true
     // GoXLR profile to load while playing, the one before comes back after; empty: none
     readonly property string goxlrGameProfile: user.goxlrGameProfile ?? ""
+    // A small line with fps, cpu and gpu over the game while game mode is on. fps comes
+    // from MangoHud (services/GameStats: the game needs it loaded, Steam: `mangohud %command%`);
+    // where it sits: top-left, top-right, bottom-left or bottom-right
+    readonly property bool fpsOverlay: user.fpsOverlay ?? false
+    readonly property string fpsOverlayPosition: user.fpsOverlayPosition ?? "top-left"
     // Over a fullscreen window (a game's menu, the mouse free) the bar comes down while the
     // mouse rests on the top edge of the screen, and goes up again once it leaves the bar
     readonly property bool barOverFullscreen: user.barOverFullscreen ?? true
