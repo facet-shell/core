@@ -945,8 +945,8 @@ local function overview(open)
     if open then
         -- Zooming out in the middle of Super+drag: the window must not keep following
         -- the cursor behind the overlay, so the drag (or resize) is released here
-        run(hl.dsp.exec_raw("mouse", "0movewindow"))
-        run(hl.dsp.exec_raw("mouse", "0resizewindow"))
+        run(hl.dsp.exec_raw("mouse 0movewindow"))
+        run(hl.dsp.exec_raw("mouse 0resizewindow"))
     end
     for _, b in ipairs(DRAG_BINDS) do
         for _ = 1, 4 do

@@ -61,9 +61,9 @@ for key, char in pairs({ q = "@", e = "€" }) do
         if #hl.get_layers({ namespace = "qs-launcher" }) > 0 then
             hl.exec_cmd("qs ipc call launcher type " .. char)
         elseif w and w.class == "vesktop" then
-            hl.dispatch(hl.dsp.exec_raw("sendshortcut", "CTRL ALT, " .. key .. ", activewindow"))
+            hl.dispatch(hl.dsp.exec_raw("sendshortcut CTRL ALT, " .. key .. ", activewindow"))
         else
-            hl.dispatch(hl.dsp.exec_raw("sendshortcut", "MOD5, " .. key .. ", activewindow"))
+            hl.dispatch(hl.dsp.exec_raw("sendshortcut MOD5, " .. key .. ", activewindow"))
         end
     end, { description = "frame shell · type " .. char })
 end

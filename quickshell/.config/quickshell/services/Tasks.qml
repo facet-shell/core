@@ -192,7 +192,7 @@ Singleton {
     // Hyprland's Lua config takes dispatches through eval (Apps.summon does the same)
     function close(app) {
         if (app.windowed) {
-            const calls = app.windows.map(a => `hl.dispatch(hl.dsp.exec_raw("closewindow", "address:${a.replace(/[^0-9a-fx]/gi, "")}"))`);
+            const calls = app.windows.map(a => `hl.dispatch(hl.dsp.exec_raw("closewindow address:${a.replace(/[^0-9a-fx]/gi, "")}"))`);
             Quickshell.execDetached(["hyprctl", "eval", calls.join(" ")]);
         } else {
             Quickshell.execDetached(["kill", "-TERM", "--"].concat(app.pids.map(String)));
