@@ -45,27 +45,35 @@ Singleton {
 
     // ── Audio channels ───────────────────────────────────────
 
-    // What can be recorded: [{ key, label, source }], source as pactl names it. The GoXLR's
-    // outputs (their monitors) and inputs from Config.goxlrOutputs / goxlrInputs, plus its
-    // stream mix; without a GoXLR the default output's monitor and the default input.
+    // What can be recorded: [{ key, label, source }], source as pactl names it.
+    // GoXLR: its outputs (their monitors) and inputs from Config.goxlrOutputs / goxlrInputs,
+    // plus its stream mix. Virtual channels (facet audio channels): every channel's monitor
+    // and the default input. Neither: the default output's monitor and the default input.
     readonly property var channels: {
         const out = [];
-        for (const key of Object.keys(Config.goxlrOutputs)) {
-            const node = Audio.findDevice(Audio.sinks, Config.goxlrOutputs[key]);
-            if (node)
-                out.push({ key, label: key, source: `${node.name}.monitor` });
+        if (Audio.channelSource === "goxlr") {
+            for (const key of Object.keys(Config.goxlrOutputs)) {
+                const node = Audio.goxlrDevice(Audio.sinks, Config.goxlrOutputs[key]);
+                if (node)
+                    out.push({ key, label: key, source: `${node.name}.monitor` });
+            }
+            for (const key of Object.keys(Config.goxlrInputs)) {
+                const node = Audio.goxlrDevice(Audio.sources, Config.goxlrInputs[key]);
+                if (node)
+                    out.push({ key, label: key, source: node.name });
+            }
+            const mix = Audio.findDevice(Audio.sources, "GoXLR Stream Mix 1");
+            if (mix)
+                out.push({ key: "stream mix", label: "stream mix", source: mix.name });
+        } else if (Audio.virtualActive) {
+            for (const c of Audio.virtualChannels)
+                out.push({ key: c.key, label: c.label.toLowerCase(), source: `${c.node.name}.monitor` });
         }
-        for (const key of Object.keys(Config.goxlrInputs)) {
-            const node = Audio.findDevice(Audio.sources, Config.goxlrInputs[key]);
-            if (node)
-                out.push({ key, label: key, source: node.name });
-        }
-        const mix = Audio.findDevice(Audio.sources, "GoXLR Stream Mix 1");
-        if (mix)
-            out.push({ key: "stream mix", label: "stream mix", source: mix.name });
+        const mic = Audio.sources.find(n => n.name === Pipewire.defaultAudioSource?.name && !Audio.isMonitor(n)) ?? Audio.inputs[0];
+        if (Audio.virtualActive && mic && !out.some(c => c.key === "mic"))
+            out.push({ key: "mic", label: "mic", source: mic.name });
         if (out.length === 0) {
             const sink = Audio.sinks.find(n => n.name === Pipewire.defaultAudioSink?.name) ?? Audio.sinks[0];
-            const mic = Audio.sources.find(n => n.name === Pipewire.defaultAudioSource?.name) ?? Audio.sources.find(n => !Audio.isMonitor(n));
             if (sink)
                 out.push({ key: "desktop", label: "desktop", source: `${sink.name}.monitor` });
             if (mic)

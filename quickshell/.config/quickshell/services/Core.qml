@@ -11,6 +11,8 @@ Scope {
     Scope {
         Component.onCompleted: {
             Spotify.refresh();
+            // The app rules for the virtual channels (does nothing without them)
+            Channels.start();
             // A shell that died while the screen was locked left the wallpaper frozen
             // (frame-wallpaper pause); this one lets it run again
             Quickshell.execDetached(["sh", "-c", 'w="$HOME/.local/bin/frame-wallpaper"; [ -x "$w" ] && "$w" resume-if-paused']);

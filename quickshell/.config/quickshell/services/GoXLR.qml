@@ -39,6 +39,26 @@ Singleton {
     property bool micButtonMuted: false
     // Poll faster while the control center shows the levels (only while the websocket is down)
     property bool fast: false
+    // The utility is only asked while the GoXLR can be the channel source (Config.audioChannels
+    // "auto" or "goxlr"); with "virtual" or "none" nothing polls and the socket stays closed
+    readonly property bool wanted: Config.audioChannels !== "virtual" && Config.audioChannels !== "none"
+
+    onWantedChanged: {
+        if (wanted) {
+            retryDelay = 1000;
+            socket.active = true;
+            return;
+        }
+        reconnect.stop();
+        socket.active = false;
+        daemonStatus = null;
+        pending = {};
+        available = false;
+        faders = [];
+        live = {};
+        volumes = {};
+        micButtonMuted = false;
+    }
 
     // The whole status as the utility last sent it over the websocket, kept to apply its
     // patches to; null while the socket is down or the first status has not come yet
@@ -69,7 +89,8 @@ Singleton {
         const xhr = new XMLHttpRequest();
         xhr.open(method, `${Config.goxlrApi}${path}`);
         xhr.onreadystatechange = () => {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
+            // An answer that comes in after the GoXLR was switched off in the settings
+            if (xhr.readyState !== XMLHttpRequest.DONE || !root.wanted)
                 return;
             if (xhr.status !== 200) {
                 root.available = false;
@@ -93,7 +114,7 @@ Singleton {
                 root.available = false;
             }
             // The utility is back: connect now instead of waiting out the backoff
-            if (!was && root.available && socket.status !== WebSocket.Open && socket.status !== WebSocket.Connecting) {
+            if (!was && root.available && root.wanted && socket.status !== WebSocket.Open && socket.status !== WebSocket.Connecting) {
                 root.retryDelay = 1000;
                 reconnect.stop();
                 socket.active = true;
@@ -216,14 +237,15 @@ Singleton {
         id: socket
         // http://host:port → ws://host:port (https → wss)
         url: `${Config.goxlrApi.replace(/^http/, "ws").replace(/\/+$/, "")}/api/websocket`
-        active: true
+        // Not a binding: the handlers below switch it off and on again to reconnect
+        Component.onCompleted: active = root.wanted
 
         onStatusChanged: {
             if (status === WebSocket.Open) {
                 console.info("goxlr: live over the utility's websocket");
                 root.retryDelay = 1000;
                 root.loadStatus();
-            } else if ((status === WebSocket.Closed || status === WebSocket.Error) && active) {
+            } else if ((status === WebSocket.Closed || status === WebSocket.Error) && active && root.wanted) {
                 if (root.daemonStatus !== null)
                     console.warn(`goxlr: lost the utility's websocket (${errorString || "closed"}), polling until it is back`);
                 root.daemonStatus = null;
@@ -240,7 +262,7 @@ Singleton {
 
     Timer {
         id: reconnect
-        onTriggered: socket.active = true
+        onTriggered: socket.active = root.wanted
     }
 
     // Sends a GoXLRCommand for this mixer: over the websocket when it is up (the utility's
@@ -365,7 +387,7 @@ Singleton {
     // every 2 s, and the socket connects as soon as it answers again (see refresh())
     Timer {
         interval: root.available ? (root.fast ? 300 : 600) : 2000
-        running: !root.streaming
+        running: root.wanted && !root.streaming
         repeat: true
         triggeredOnStart: true
         onTriggered: root.refresh()

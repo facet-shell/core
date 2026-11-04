@@ -24,3 +24,28 @@ facet add core
 Files in the package folders are linked into your home with GNU Stow; files with colors come
 from `templates/` and are written by `facet theme` in the active theme. Ideas and bugs:
 [the board](https://github.com/orgs/facet-shell/projects/1).
+
+## Sound with and without a GoXLR
+
+The channels (System, Game, Chat, Music: apps routed onto them in the app mixer, a fader and
+a mute each in the control center, a track each in a recording) come from one of two places;
+`audioChannels` in the settings (sound) picks one, `auto` takes the first that is there:
+
+| | GoXLR | virtual channels | neither |
+|---|---|---|---|
+| where they come from | GoXLR Utility's outputs and mic inputs | `facet audio channels on`: PipeWire loopbacks into your output | – |
+| app mixer | a chip per channel | a chip per channel, rules put new apps on theirs (Vesktop → Chat, Spotify → Music, the running game → Game) | a device list per app, master rows for output and mic |
+| control center | the physical faders (levels follow, mutes work) | a slider and a mute per channel, then the real output | volume and mic mute |
+| recording | a track per GoXLR output and input, plus the stream mix | a track per channel and the mic | the default output and the mic |
+| game mode | loads `goxlrGameProfile` | the game's sound lands on Game | – |
+| OSD | fader moves and the mic button | channel levels and mutes | the default output's volume |
+| lights | `facet goxlr` in the theme's colors | – | – |
+
+The virtual channels are optional and only exist once `facet audio channels on` made them:
+`~/.config/pipewire/pipewire.conf.d/facet-channels.conf` (one loopback per channel, sinks
+`facet-<name>`, System becomes the default output) and `~/.local/state/frameshell/audio-channels.json`
+for the shell. Sinks of the same name you already have are taken over instead of doubled, and
+an EasyEffects sink works as the output they play into. `facet audio channels output <sink>`
+moves them to another device, `facet audio channels off` removes all of it and puts every app
+back on the output. Without them and without a GoXLR nothing about channels shows; the shell
+never writes PipeWire config itself (`services/Audio.qml`, `services/Channels.qml`).

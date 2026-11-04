@@ -2,7 +2,8 @@
 # frame-record-mix – the sound for a screen recording (services/Recorder.qml).
 #
 # wf-recorder records one PipeWire source. To record several at once, each at its own level
-# (the GoXLR's System, Game, Chat, Music, the mic …), this makes a sink "frame-rec" and loops
+# (the GoXLR's System, Game, Chat, Music, the mic …, or the virtual channels of
+# `facet audio channels on`, whose sinks are facet-<name>), this makes a sink "frame-rec" and loops
 # every chosen source into it; wf-recorder then records frame-rec.monitor.
 #
 #   frame-record-mix start <source>=<percent> ...   e.g. alsa_output…Speaker__sink.monitor=100

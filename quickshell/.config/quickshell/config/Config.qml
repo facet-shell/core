@@ -194,7 +194,8 @@ Singleton {
     // their GitHub repos). false: neither checked nor shown; packages still are.
     readonly property bool frameUpdates: user.frameUpdates ?? true
 
-    // goxlr-utility HTTP API (fader levels and mutes)
+    // goxlr-utility HTTP API (fader levels and mutes); not asked at all while audioChannels
+    // is "virtual" or "none"
     readonly property string goxlrApi: user.goxlrApi ?? "http://localhost:14564"
     // App mixer routes → PipeWire device description, as shown by `wpctl status`.
     // "GoXLR Music" also matches the Mini's "GoXLRMini Music"; rename the right side
@@ -209,6 +210,34 @@ Singleton {
         "chat mic": "GoXLR Chat Mic",
         sampler: "GoXLR Sampler"
     })
+
+    // ── Sound channels ───────────────────────────────────────
+
+    // Where the app mixer's channels, the control center's faders and the recorder's tracks
+    // come from: "auto" (a GoXLR when one is there, else the virtual channels when
+    // `facet audio channels on` set them up, else none), "goxlr", "virtual" or "none" (plain
+    // devices only). The virtual channels are never made by the shell; without them and
+    // without a GoXLR nothing about channels shows.
+    readonly property string audioChannels: user.audioChannels ?? "auto"
+    // Virtual channels only: which app goes on which channel when it starts playing, as
+    // [pattern, channel] pairs, first match wins. The pattern is checked against the app's
+    // name and its program (pw-dump or the mixer show them), any case, * matches anything;
+    // "@game" is the game that runs (game mode's detection). An app you move in the mixer
+    // stays where you put it, whatever the rules say.
+    readonly property var audioRuleDefaults: [
+        ["vesktop", "chat"],
+        ["discord", "chat"],
+        ["webcord", "chat"],
+        ["WEBRTC VoiceEngine", "chat"],
+        ["teamspeak*", "chat"],
+        ["mumble", "chat"],
+        ["spotify", "music"],
+        ["tidal-hifi", "music"],
+        ["@game", "game"]
+    ]
+    readonly property var audioRules: user.audioRules ?? audioRuleDefaults
+    // false: the rules are kept but nothing is moved by them
+    readonly property bool audioRulesOn: user.audioRulesOn ?? true
 
     // ── Launcher ─────────────────────────────────────────────
 
