@@ -24,13 +24,27 @@ Singleton {
     // ── Game detection ───────────────────────────────────────
 
     // Steam starts games with the window class steam_app_<id> (Proton and native alike);
-    // gamescope wraps them in its own window; Config.gameClasses adds the rest
-    function isGame(appId) {
+    // gamescope wraps them in its own window; Config.gameClasses adds the rest (the list in
+    // the settings: Sober, GeForce NOW, ...)
+    function isGame(appId, title) {
         const id = String(appId ?? "");
-        return /^steam_app_\d+$/.test(id) || id === "gamescope" || Config.gameClasses.includes(id);
+        return /^steam_app_\d+$/.test(id) || id === "gamescope"
+            || Config.gameClasses.some(entry => matchesGame(String(entry).trim(), id, String(title ?? "")));
     }
 
-    readonly property var games: ToplevelManager.toplevels.values.filter(t => root.isGame(t.appId))
+    // A list entry: a window class, any case, where * matches anything; "title:" checks the
+    // window title instead (GeForce NOW in a browser tab)
+    function matchesGame(entry, appId, title) {
+        if (entry === "")
+            return false;
+        const byTitle = entry.toLowerCase().startsWith("title:");
+        const pattern = byTitle ? entry.slice(6).trim() : entry;
+        const parts = pattern.split("*").map(part => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"));
+        const regex = new RegExp("^" + parts.join(".*") + "$", "i");
+        return regex.test(byTitle ? title : appId);
+    }
+
+    readonly property var games: ToplevelManager.toplevels.values.filter(t => root.isGame(t.appId, t.title))
     readonly property bool gameRunning: games.length > 0
     readonly property string gameTitle: games.length > 0 ? (games[0].title || games[0].appId) : ""
 

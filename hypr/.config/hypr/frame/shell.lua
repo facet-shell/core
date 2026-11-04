@@ -89,6 +89,11 @@ take("SUPER + SHIFT + R", shell("screenshot", "record"), { description = "frame 
 -- the drawing stays for next time; take() drops the distro's own Super+P first
 take("SUPER + P", shell("draw", "toggle"), { description = "frame shell · draw on the screen (again: hide)" })
 take("SUPER + SHIFT + P", shell("draw", "clear"), { description = "frame shell · draw: clear the drawing" })
+-- Discord voice (quickshell/voice): move the overlay, mute and deafen from anywhere, a game
+-- included; Discord needs no keybind of its own for that
+take("SUPER + SHIFT + V", shell("voice", "move"), { description = "frame shell · voice overlay: move it (again or Esc: done)" })
+take("SUPER + SHIFT + M", shell("voice", "mute"), { description = "frame shell · Discord: mute or unmute" })
+take("SUPER + SHIFT + D", shell("voice", "deafen"), { description = "frame shell · Discord: deafen or undeafen" })
 
 -- Windows over each other (on the canvas nothing keeps them apart): Alt+Tab goes to the next
 -- window and brings it up, Super+Alt+B sends the active one to the back. Super+Alt+S puts the

@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
+import Quickshell.Wayland
 import qs.components
 import qs.config
 import qs.services
@@ -22,9 +23,9 @@ FocusScope {
     readonly property var sections: [
         ["look", "look", "theme, layout, wallpaper"],
         ["shell", "shell", "lock, weather"],
-        ["notifications", "notifications", "what shows when, look, Spotify"],
+        ["notifications", "notifications", "what shows when, look, Spotify, voice"],
         ["launcher", "launcher", "search, Claude, files, timers"],
-        ["games", "games", "game mode"],
+        ["games", "games", "game mode, which apps are games"],
         ["sound", "sound", "output and input"],
         ["apps", "apps", "modules and their apps"],
         ["system", "system", "updates, boot, login, about"]
@@ -400,6 +401,201 @@ FocusScope {
                     text: txt.placeholder
                     color: Theme.muted
                     font: field.font
+                }
+            }
+        }
+    }
+
+    // Apps that count as games (Config.gameClasses): what is on the list (✕ takes it off), and
+    // three ways to add one: typed in (a class, *patterns*, or title:…), picked from the
+    // windows open right now, or one of the suggestions
+    component GameListSetting: ColumnLayout {
+        id: games
+
+        readonly property var list: Config.gameClasses
+        property bool picking: false
+
+        // Already on it, any case
+        function has(entry) {
+            return list.some(x => String(x).toLowerCase() === String(entry).toLowerCase());
+        }
+
+        function add(entry) {
+            const e = String(entry).trim();
+            if (e !== "" && !has(e))
+                Config.set("gameClasses", list.concat([e]));
+        }
+
+        function remove(entry) {
+            const next = list.filter(x => x !== entry);
+            if (next.length === 0)
+                Config.reset("gameClasses");
+            else
+                Config.set("gameClasses", next);
+        }
+
+        // The window classes are guesses until checked with hyprctl clients; the GeForce NOW
+        // and Minecraft ones are patterns for that reason
+        readonly property var suggestions: [
+            ["org.vinegarhq.Sober", "Sober (Roblox)"],
+            ["*geforce*", "GeForce NOW app"],
+            ["title:*GeForce NOW*", "GeForce NOW in the browser"],
+            ["Minecraft*", "Minecraft"],
+            ["osu!", "osu!"],
+            ["retroarch", "RetroArch"]
+        ].filter(s => !has(s[0]))
+
+        // One entry per class of the windows open now, without the shell and what already counts
+        readonly property var openWindows: {
+            const seen = new Set();
+            const out = [];
+            for (const t of ToplevelManager.toplevels.values) {
+                const id = String(t.appId ?? "");
+                if (id === "" || seen.has(id.toLowerCase()) || id.startsWith("org.quickshell") || Toggles.isGame(id, t.title))
+                    continue;
+                seen.add(id.toLowerCase());
+                out.push([id, t.title ?? ""]);
+            }
+            return out;
+        }
+
+        Layout.fillWidth: true
+        spacing: 8
+
+        Text {
+            Layout.fillWidth: true
+            text: "games for game mode"
+            color: Theme.text
+            font.family: Theme.font
+            font.pixelSize: 14
+        }
+        Text {
+            Layout.fillWidth: true
+            text: "Steam games and gamescope count by themselves; add the rest here. A window class (any case, * matches anything) or title:… for the window title"
+            color: Theme.muted
+            font.family: Theme.font
+            font.pixelSize: 12
+            wrapMode: Text.Wrap
+        }
+
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Text {
+                visible: games.list.length === 0
+                text: "nothing on the list yet"
+                color: Theme.muted
+                font.family: Theme.font
+                font.pixelSize: 13
+            }
+            Repeater {
+                model: games.list
+                delegate: Action {
+                    required property var modelData
+                    text: `${modelData}  ✕`
+                    tint: Theme.text
+                    onClicked: games.remove(modelData)
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Rectangle {
+                Layout.preferredWidth: 300
+                Layout.preferredHeight: 30
+                color: "transparent"
+                border.width: 1
+                border.color: entry.activeFocus ? Theme.primary : Theme.border
+
+                TextInput {
+                    id: entry
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    anchors.rightMargin: 10
+                    verticalAlignment: TextInput.AlignVCenter
+                    color: Theme.text
+                    font.family: Theme.font
+                    font.pixelSize: 14
+                    clip: true
+                    selectByMouse: true
+                    onAccepted: {
+                        games.add(text);
+                        text = "";
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: entry.text === "" && !entry.activeFocus
+                        text: "class, *pattern* or title:…"
+                        color: Theme.muted
+                        font: entry.font
+                    }
+                }
+            }
+            Action {
+                text: "add"
+                available: entry.text.trim() !== ""
+                onClicked: {
+                    games.add(entry.text);
+                    entry.text = "";
+                }
+            }
+            Action {
+                text: "from open windows"
+                active: games.picking
+                onClicked: games.picking = !games.picking
+            }
+        }
+
+        // The open windows: a click puts the class on the list
+        Flow {
+            Layout.fillWidth: true
+            visible: games.picking
+            spacing: 6
+
+            Text {
+                visible: games.openWindows.length === 0
+                text: "no other windows open; start the game, then look here again"
+                color: Theme.muted
+                font.family: Theme.font
+                font.pixelSize: 13
+            }
+            Repeater {
+                model: games.picking ? games.openWindows : []
+                delegate: Action {
+                    required property var modelData
+                    text: modelData[1] !== "" ? `+ ${modelData[0]} · ${modelData[1].slice(0, 28)}` : `+ ${modelData[0]}`
+                    onClicked: {
+                        games.add(modelData[0]);
+                        games.picking = false;
+                    }
+                }
+            }
+        }
+
+        Flow {
+            Layout.fillWidth: true
+            visible: games.suggestions.length > 0
+            spacing: 6
+
+            Text {
+                height: 30
+                verticalAlignment: Text.AlignVCenter
+                text: "suggestions"
+                color: Theme.muted
+                font.family: Theme.font
+                font.pixelSize: 12
+            }
+            Repeater {
+                model: games.suggestions
+                delegate: Action {
+                    required property var modelData
+                    text: `+ ${modelData[1]}`
+                    onClicked: games.add(modelData[0])
                 }
             }
         }
@@ -828,6 +1024,49 @@ FocusScope {
                             max: 20
                             unit: " s"
                         }
+
+                        Heading { text: "Discord voice overlay · faces and names, no frame or background" }
+                        ChoiceSetting {
+                            key: "voiceOverlayWhen"
+                            title: "shows"
+                            hint: "only while you are in a voice channel"
+                            options: [["always", "always"], ["hidden", "Discord on no screen"], ["game", "in game"], ["never", "never"]]
+                        }
+                        ChoiceSetting {
+                            key: "voiceOverlayLook"
+                            title: "look"
+                            hint: "compact: faces in a row, names only while talking"
+                            options: [["list", "list"], ["compact", "compact"], ["talking", "only who talks"]]
+                        }
+                        ChoiceSetting {
+                            key: "voiceOverlayFeed"
+                            title: "joins, leaves, your mute"
+                            hint: "your own channel; watched channels stay notifications"
+                            options: [["overlay", "in the overlay"], ["notify", "notification"], ["both", "both"]]
+                        }
+                        NumberSetting {
+                            key: "voiceOverlaySize"
+                            title: "size"
+                            min: 0.6
+                            max: 1.6
+                            step: 0.1
+                            unit: "×"
+                        }
+                        BoolSetting {
+                            key: "voiceOverlayDim"
+                            title: "dim the quiet ones"
+                            hint: "list look: who talks stays bright"
+                        }
+                        Setting {
+                            key: "voiceOverlayPos"
+                            title: "place"
+                            hint: "Super+Shift+V, then drag it; Esc keeps the spot (per screen). default: left, under the bar"
+
+                            Action {
+                                text: "move"
+                                onClicked: Quickshell.execDetached(["qs", "ipc", "call", "voice", "move"])
+                            }
+                        }
                     }
 
                     // ── launcher ──
@@ -894,7 +1133,7 @@ FocusScope {
                         BoolSetting {
                             key: "gameModeAuto"
                             title: "game mode by itself"
-                            hint: "on while a Steam game or gamescope runs, off again after"
+                            hint: "on while a Steam game, gamescope or one from the list below runs, off again after"
                         }
                         BoolSetting {
                             key: "gameModeSilent"
@@ -906,13 +1145,7 @@ FocusScope {
                             title: "bar at the top edge over fullscreen"
                             hint: "rest the mouse on the top edge in a game's menu, the bar comes down over it"
                         }
-                        TextSetting {
-                            key: "gameClasses"
-                            list: true
-                            title: "other games"
-                            hint: "window classes as hyprctl clients shows them, comma separated"
-                            placeholder: "e.g. minecraft, osu!"
-                        }
+                        GameListSetting {}
                         TextSetting {
                             key: "goxlrGameProfile"
                             title: "GoXLR profile while playing"

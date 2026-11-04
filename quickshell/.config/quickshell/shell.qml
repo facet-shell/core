@@ -18,6 +18,7 @@ import qs.osd
 import qs.screenshot
 import qs.services
 import qs.settings
+import qs.voice
 import qs.wallpapers
 
 // Entry point. Each module is added here as it gets built.
@@ -141,6 +142,11 @@ ShellRoot {
     }
 
     SpotifyPopup {}
+
+    // Discord voice: who is in your channel and who talks, on the left (Super+Shift+V moves it)
+    VoiceOverlay {
+        hidden: lock.active
+    }
 
     // Hold Super for 1.5 seconds (hypr/frame/hotkeys.lua); closed while locked or
     // while Super is busy with the canvas overview

@@ -132,6 +132,20 @@ Singleton {
     readonly property real spotifySize: user.spotifySize ?? 1
     readonly property int spotifySeconds: user.spotifySeconds ?? 6
 
+    // The Discord voice overlay while you are in a voice channel: when it shows ("always",
+    // "hidden": Discord on no screen, "game": while game mode is on, "never"); list, compact
+    // (faces, names while talking) or talking (only who talks, and you); where joins, leaves
+    // and your mute go ("overlay", "notify" or "both"); size as a factor; whether the quiet
+    // ones are dimmed. No title, frame or background, just faces and names with a thin dark
+    // outline so they read over any game. voiceOverlayPos keeps the spot per screen,
+    // { "DP-1": [x, y] }, set by moving it (Super+Shift+V); without one: left, under the bar.
+    readonly property string voiceOverlayWhen: user.voiceOverlayWhen ?? "hidden"
+    readonly property string voiceOverlayLook: user.voiceOverlayLook ?? "list"
+    readonly property string voiceOverlayFeed: user.voiceOverlayFeed ?? "overlay"
+    readonly property real voiceOverlaySize: user.voiceOverlaySize ?? 1
+    readonly property bool voiceOverlayDim: user.voiceOverlayDim ?? true
+    readonly property var voiceOverlayPos: user.voiceOverlayPos ?? ({})
+
     // "left", "right" or "center" of a position, and whether it is at the top
     function side(position) {
         return position.endsWith("left") ? "left" : position.endsWith("right") ? "right" : "center";
@@ -197,7 +211,9 @@ Singleton {
     // the classes below), off again when the last one closes. The toggle in the control
     // center still works by hand.
     readonly property bool gameModeAuto: user.gameModeAuto ?? true
-    // Other games, by window class as `hyprctl clients` shows it (exact names, no patterns)
+    // Other games and game apps (Sober, GeForce NOW, ...): window classes as `hyprctl clients`
+    // shows them, any case; * matches anything ("*geforce*"), and "title:" matches the
+    // window title instead ("title:*GeForce NOW*" also catches it in a browser tab)
     readonly property var gameClasses: user.gameClasses ?? []
     // While playing, the notification rules hold back what is set to "not in game";
     // false: everything shows as if no game ran

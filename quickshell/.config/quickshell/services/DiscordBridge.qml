@@ -21,9 +21,12 @@ import qs.config
 //     newest message's ms, last { author, content, mine, time } that message, mentions the ping count)
 //   { type: "last_dm", userId, name, channelId, guessed }   (you wrote a DM; guessed: most recent DM, not known)
 //   { type: "sent", ok, to, error }
+//   { type: "voice_state", channelId (empty: in no voice channel), channel, guild,
+//     members: [{ userId, name, avatar, you, muted, deafened, streaming, speaking }] }   (for the overlay)
+//   { type: "speaking", userId, speaking }
 // shell → Discord:
-//   { cmd: "accept_call" | "decline_call" | "call_back" | "join_voice" | "open_channel" | "toggle_mute" | "toggle_deafen",
-//     channelId?, guildId? }
+//   { cmd: "accept_call" | "decline_call" | "call_back" | "join_voice" | "leave_voice" | "open_channel"
+//     | "toggle_mute" | "toggle_deafen" | "voice_state", channelId?, guildId? }
 //   { cmd: "list_contacts" } | { cmd: "open_dm" | "call_user", userId, channelId? } | { cmd: "send_dm", userId, content, channelId? }
 //   | { cmd: "reply_last", content }
 Singleton {
@@ -36,6 +39,41 @@ Singleton {
     // For the launcher (d): DMs and friends, and who "d reply" goes to
     property var contacts: []
     property var lastDm: null
+
+    // ── Voice overlay (voice/VoiceOverlay.qml) ───────────────
+
+    // Your voice channel and who is in it; speaking: userId → true while their mic is open
+    readonly property var noVoice: ({ channelId: "", channel: "", guild: "", members: [] })
+    property var voice: noVoice
+    property var speaking: ({})
+    readonly property bool inVoice: connected && voice.channelId !== ""
+
+    // The overlay is on screen (Config.voiceOverlayWhen); then joins, leaves and your mute
+    // go there instead of, or as well as, a notification (Config.voiceOverlayFeed)
+    readonly property bool overlayShown: inVoice && (Config.voiceOverlayWhen === "always"
+        || (Config.voiceOverlayWhen === "hidden" && !Notifications.onScreen("vesktop"))
+        || (Config.voiceOverlayWhen === "game" && Toggles.gameMode))
+    readonly property bool feedsOverlay: overlayShown && Config.voiceOverlayFeed !== "notify"
+    readonly property bool overlayOnly: overlayShown && Config.voiceOverlayFeed === "overlay"
+
+    // A line for the overlay's feed: "in" (joined, went live), "out" (left), "self" (your mute)
+    signal voiceLine(string text, string kind)
+
+    function setVoice(event) {
+        // Who went live since the last list, for the feed
+        if (feedsOverlay && event.channelId === voice.channelId) {
+            const before = new Set(voice.members.filter(m => m.streaming).map(m => m.userId));
+            for (const m of event.members ?? [])
+                if (m.streaming && !before.has(m.userId) && !m.you)
+                    voiceLine(`● ${m.name} went live`, "in");
+        }
+        voice = { channelId: event.channelId ?? "", channel: event.channel ?? "", guild: event.guild ?? "", members: event.members ?? [] };
+        const next = {};
+        for (const m of voice.members)
+            if (m.speaking)
+                next[m.userId] = true;
+        speaking = next;
+    }
 
     function refreshContacts() {
         send({ cmd: "list_contacts" });
@@ -119,6 +157,13 @@ Singleton {
             });
             break;
         case "voice":
+            // Your own channel: into the overlay while it shows (and as a notification, if
+            // Config.voiceOverlayFeed says so)
+            if (!event.watched && root.feedsOverlay)
+                root.voiceLine(`${event.action === "join" ? "→" : "←"} ${event.user} ${event.action === "join" ? "joined" : "left"}`,
+                    event.action === "join" ? "in" : "out");
+            if (!event.watched && root.overlayOnly)
+                break;
             // Your own channel: just the news. A watched channel: offer to join
             Notifications.push({
                 app: event.watched ? "discord · watching" : "discord · voice",
@@ -166,6 +211,11 @@ Singleton {
                 root.callEnded(event);
             break;
         case "self":
+            if (root.feedsOverlay)
+                root.voiceLine(event.deafened ? "✕ you are deafened" : event.muted ? "✕ you muted yourself" : "✓ you unmuted yourself",
+                    event.muted || event.deafened ? "self" : "in");
+            if (root.overlayOnly)
+                break;
             Notifications.push({
                 app: "discord",
                 rule: "dc.self",
@@ -186,6 +236,18 @@ Singleton {
         case "last_dm":
             lastDm = event;
             break;
+        case "voice_state":
+            root.setVoice(event);
+            break;
+        case "speaking": {
+            const next = Object.assign({}, speaking);
+            if (event.speaking)
+                next[event.userId] = true;
+            else
+                delete next[event.userId];
+            speaking = next;
+            break;
+        }
         case "sent":
             Notifications.push({
                 app: "discord",
@@ -211,10 +273,18 @@ Singleton {
             id: client
 
             onConnectedChanged: {
-                if (connected)
+                if (connected) {
                     root.clients = root.clients.concat([client]);
-                else
+                    // A shell that started while you were in a call learns who is in it
+                    root.send({ cmd: "voice_state" });
+                } else {
                     root.clients = root.clients.filter(c => c !== client);
+                    // Discord closed: no call any more
+                    if (root.clients.length === 0) {
+                        root.voice = root.noVoice;
+                        root.speaking = {};
+                    }
+                }
             }
 
             parser: SplitParser {
