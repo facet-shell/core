@@ -1,11 +1,16 @@
-# facet · shell
+# facet · core
 
-The facet desktop: Quickshell (bar, launcher, lockscreen, notifications, control center, OSD, screenshots, wallpaper app), the Hyprland Lua config, the wallpaper helper, the login screen (greetd), the boot splash and the GTK theme. Always installed.
+What every facet look shares and nothing that draws: the Quickshell services and bridges
+(notifications and their rules, Discord, Steam, Spotify, GoXLR, sound, game mode, screen
+recording, clipboard, timers, weather, stats, updates), the settings (`config/Config.qml`),
+the infinite canvas logic, the Hyprland Lua config, the wallpaper helper and the shell's
+scripts. A look ([look-tui](https://github.com/facet-shell/look-tui)) puts its bar, panels
+and popups on top and starts with `Core {}`. Always installed.
 
 Part of [facet](https://github.com/facet-shell); install it with the `facet` command:
 
 ```bash
-facet add shell
+facet add core
 ```
 
 Files in the package folders are linked into your home with GNU Stow; files with colors come
