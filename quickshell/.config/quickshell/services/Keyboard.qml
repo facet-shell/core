@@ -6,8 +6,9 @@ import Quickshell.Io
 import qs.config
 
 // Front end for ~/.local/bin/frame-keyboard (keyboard package): lighting, Fn keys and
-// per-key colors of the AULA F75. Key ids are physical keys named like a US board
-// ("y" is the key labelled Z on QWERTZ); actions typed by hand are read as QWERTZ.
+// per-key colors of the board picked with `facet keyboard set` (or the one plugged in).
+// Key ids are physical keys named like a US board ("y" is the key labelled Z on QWERTZ);
+// actions typed by hand are read as QWERTZ.
 //
 // Nothing reaches the keyboard while `live` is false: frame-keyboard then only prints the
 // packets it would send (shown in `log`) and answers reads with placeholder data.
@@ -21,6 +22,15 @@ Singleton {
     property bool live: Config.keyboardLive
     readonly property bool busy: queue.length > 0 || proc.job !== null
 
+    // frame-keyboard board --json --layout de: { id, name, vendor, family, tested, can: {
+    //   effects, brightness, speed, perkey, live, fn, layers }, rows: [[{ id, label, w }]], keys }
+    property var board: null
+    readonly property string boardName: board?.name ?? "keyboard"
+    readonly property var can: board?.can ?? ({ effects: true, brightness: 9, speed: 4, perkey: true, live: true, fn: true, layers: ["base", "fn1", "fn2", "tap"] })
+    // The map in the app: [label, key id, width in keys] per key, an empty id is a gap
+    readonly property var keyRows: (board?.rows ?? []).map(row => row.map(k => [k.label, k.id, k.w]))
+    property string tablesFor: ""
+
     property var devices: []
     property var effects: []
     property var actions: ({ media: [], lighting: [], mods: [], keys: [], defaults: {} })
@@ -32,7 +42,8 @@ Singleton {
     property string log: ""
     property string error: ""
 
-    readonly property bool connected: devices.some(d => d.config)
+    // The picked board's configuration interface is there (frame-keyboard list --json)
+    readonly property bool connected: devices.some(d => d.config && (!board || (d.boards ?? []).includes(board.id)))
     readonly property bool dongleOnly: !connected && devices.some(d => d.kind === "dongle")
 
     property var queue: []
@@ -83,7 +94,7 @@ Singleton {
         return out;
     }
 
-    readonly property bool hintWanted: live && available && hintKeys.length > 0
+    readonly property bool hintWanted: live && available && can.live && hintKeys.length > 0
     onHintWantedChanged: hint.running = hintWanted
     onHintKeysChanged: pushHint()
 
@@ -103,12 +114,25 @@ Singleton {
     }
 
     function refresh() {
+        // The board first: the effects and Fn actions are its own (loadTables)
+        run(["board", "--json", "--layout", "de"], "board");
         run(["list", "--json"], "devices");
-        if (effects.length === 0) {
-            run(["effects", "--json"], "effects");
-            run(["actions", "--json"], "actions");
-        }
         readInfo();
+    }
+
+    // Effects and Fn actions of the board, once per board
+    function loadTables() {
+        // An older frame-keyboard knows no boards: one set of tables, as before
+        const id = board?.id ?? "-";
+        if (tablesFor === id)
+            return;
+        tablesFor = id;
+        effects = [];
+        actions = { media: [], lighting: [], mods: [], keys: [], defaults: {} };
+        if (can.effects)
+            run(["effects", "--json"], "effects");
+        if (can.fn)
+            run(["actions", "--json"], "actions");
     }
 
     function readInfo() {
@@ -194,10 +218,15 @@ Singleton {
                 const text = this.text;
                 if (job.kind === "write") {
                     root.log = `$ frame-keyboard ${job.args.join(" ")}\n${text}`;
+                } else if (job.kind === "board" && text.trim() === "") {
+                    root.loadTables();
                 } else if (text.trim() !== "") {
                     try {
                         const data = JSON.parse(text);
-                        if (job.kind === "devices")
+                        if (job.kind === "board") {
+                            root.board = data;
+                            root.loadTables();
+                        } else if (job.kind === "devices")
                             root.devices = data;
                         else if (job.kind === "effects")
                             root.effects = data;
