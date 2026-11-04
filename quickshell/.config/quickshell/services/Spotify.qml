@@ -5,6 +5,7 @@ import QtWebSockets
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import Quickshell.Wayland
 import qs.config
 
 // Spotify for the launcher (s mode): search, play, queue and the player controls.
@@ -47,6 +48,8 @@ Singleton {
     readonly property MprisPlayer spotifyPlayer: Mpris.players.values.find(p => p.identity === "Spotify") ?? null
     // True while the media card under the bar is open: song changes made there need no popup
     property bool cardOpen: false
+    // Spotify's own window has the focus: the song is right there, so no popup either
+    readonly property bool windowFocused: (ToplevelManager.activeToplevel?.appId ?? "").toLowerCase() === "spotify"
     // What the controls act on when Spotify is not there
     readonly property MprisPlayer otherPlayer: {
         const list = Mpris.players.values;
