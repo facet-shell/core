@@ -76,6 +76,36 @@ Singleton {
     readonly property int notificationTimeout: user.notificationTimeout ?? 5000
     readonly property int notificationsMax: user.notificationsMax ?? 3
 
+    // ── Look (the bloom style; tui keeps its square frames) ──
+
+    // How round the frame, the panels and the cards are: "small", "round" or "veryRound"
+    readonly property string corners: user.corners ?? "round"
+    // "full" (panels glide out, small things spring), "calm" (the same without the bounce) or
+    // "off" (everything at once). The desktop's own switch (gsettings enable-animations
+    // false) counts as off too.
+    readonly property string animations: user.animations ?? "full"
+    // Colors: "theme" (the one from facet theme) or "dynamic" (taken from the wallpaper,
+    // written to ~/.local/state/frameshell/bloom-dynamic.json; until something writes it the
+    // theme's colors stay)
+    readonly property string colorMode: user.colorMode ?? "theme"
+    // While game mode is on the frame and the bar step away and the windows get the whole
+    // screen; false keeps them
+    readonly property bool frameHidesInGame: user.frameHidesInGame ?? true
+
+    // Size of each popup as a factor (0.85 small, 1 normal, 1.15 large; spotifySize and
+    // voiceOverlaySize are further down) and whether it turns into a small see-through pill
+    // while game mode is on: one line, no frame
+    readonly property real notificationSize: user.notificationSize ?? 1
+    readonly property real osdSize: user.osdSize ?? 1
+    readonly property bool notificationCompactInGame: user.notificationCompactInGame ?? true
+    readonly property bool spotifyCompactInGame: user.spotifyCompactInGame ?? true
+    readonly property bool osdCompactInGame: user.osdCompactInGame ?? true
+    readonly property bool voiceOverlayCompactInGame: user.voiceOverlayCompactInGame ?? true
+    // Size of the panels that slide out of the frame (dashboard, control center, launcher)
+    // as a factor, and whether they open smaller while game mode is on
+    readonly property real panelSize: user.panelSize ?? 1
+    readonly property bool panelsCompactInGame: user.panelsCompactInGame ?? true
+
     // ── Notifications ────────────────────────────────────────
 
     // What shows when, per kind: "always" (through game mode too), "game" (not while game mode
