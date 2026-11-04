@@ -54,13 +54,15 @@ take("SUPER + SHIFT + Escape", hl.dsp.exec_cmd("~/.local/bin/frame-shell-watchdo
 -- sees the real key and no virtual keyboard shows up as a layout change. The launcher is a
 -- layer, not a window, so while it is open the character goes to it over IPC instead (else it
 -- lands behind it). Vesktop (Chromium on Wayland) types nothing for that AltGr+key: it gets
--- Ctrl+Alt+key itself and the ShellBridge plugin inserts the character.
+-- Ctrl+Alt+key itself and the ShellBridge plugin inserts the character. Ghostty too: with Ctrl
+-- and Alt still held it read the AltGr+key as a control sequence; its config types the
+-- character for ctrl+alt+q/e (terminal module).
 for key, char in pairs({ q = "@", e = "€" }) do
     take("CTRL + ALT + " .. key:upper(), function()
         local w = hl.get_active_window()
         if #hl.get_layers({ namespace = "qs-launcher" }) > 0 then
             hl.exec_cmd("qs ipc call launcher type " .. char)
-        elseif w and w.class == "vesktop" then
+        elseif w and (w.class == "vesktop" or w.class == "com.mitchellh.ghostty") then
             hl.dispatch(hl.dsp.exec_raw("sendshortcut CTRL ALT, " .. key .. ", activewindow"))
         else
             hl.dispatch(hl.dsp.exec_raw("sendshortcut MOD5, " .. key .. ", activewindow"))
