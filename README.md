@@ -1,10 +1,10 @@
 # facet · core
 
-What every facet look shares and nothing that draws: the Quickshell services and bridges
+What every facet style shares and nothing that draws: the Quickshell services and bridges
 (notifications and their rules, Discord, Steam, Spotify, GoXLR, sound, game mode, screen
 recording, clipboard, timers, weather, stats, updates), the settings (`config/Config.qml`),
 the infinite canvas logic, the Hyprland Lua config, the wallpaper helper and the shell's
-scripts. A look ([look-tui](https://github.com/facet-shell/look-tui)) puts its bar, panels
+scripts. A style ([style-tui](https://github.com/facet-shell/style-tui)) puts its bar, panels
 and popups on top and starts with `Core {}`. Always installed.
 
 Part of [facet](https://github.com/facet-shell); install it with the `facet` command:

@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 
-// What every look starts with, before its own bar and panels: a look's shell.qml puts
+// What every style starts with, before its own bar and panels: a style's shell.qml puts
 // `Core {}` first in its ShellRoot. Nothing in here draws anything.
 Scope {
     // Singletons only come to life when something uses them; the Spotify one must listen
