@@ -272,7 +272,7 @@ Item {
                     Label {
                         anchors { left: parent.left; top: parent.top; margins: 24 }
                         visible: root.shown.length === 0
-                        text: !Wallpapers.available ? "the wallpaper package is not installed · run: frame install wallpaper"
+                        text: !Wallpapers.available ? "the wallpaper package is not installed · run: facet install wallpaper"
                             : Wallpapers.loading ? "looking for wallpapers…"
                             : Wallpapers.items.length === 0 ? "no wallpapers yet · put files in ~/Pictures/wallpapers or subscribe in the workshop"
                             : "no wallpapers match"

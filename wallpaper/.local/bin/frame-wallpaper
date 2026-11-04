@@ -4,7 +4,7 @@
 # The Quickshell wallpaper app (Super+W) is only a front end for this script, and Hyprland
 # runs `frame-wallpaper apply` at login. State: ${XDG_STATE_HOME:-~/.local/state}/frameshell/wallpaper.json
 #
-# Backends ("backend" in the state, asked once by `frame install`):
+# Backends ("backend" in the state, asked once by `facet install`):
 #   both   Wallpaper Engine scenes and videos from the Steam Workshop (linux-wallpaperengine),
 #          plus videos (mpvpaper) from the wallpaper folders; images the shell draws itself
 #   mpv    only the wallpaper folders: videos through mpvpaper, images drawn by the shell
@@ -612,7 +612,7 @@ cmd_backend() {
         *) die "backend: both (engine), mpv or image" ;;
     esac
     update --arg v "$backend" '.backend = $v'
-    # Only restart when a desktop is running (frame install sets it before the first login)
+    # Only restart when a desktop is running (facet install sets it before the first login)
     if command -v hyprctl >/dev/null && hyprctl monitors >/dev/null 2>&1; then
         cmd_apply
     fi

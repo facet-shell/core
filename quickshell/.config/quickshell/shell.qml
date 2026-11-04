@@ -155,7 +155,7 @@ ShellRoot {
         hidden: lock.active || overview.open
     }
 
-    // Infinite canvas: Super+wheel zooms out to every window (frame layout canvas)
+    // Infinite canvas: Super+wheel zooms out to every window (facet layout canvas)
     CanvasOverview {
         id: overview
         hidden: lock.active

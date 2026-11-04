@@ -178,7 +178,7 @@ Singleton {
     // ── Launcher ─────────────────────────────────────────────
 
     // Port the Spicetify extension connects to (s mode). Change it here and as PORT in
-    // spicetify/.config/spicetify/Extensions/frameshell.js, then run `frame update spicetify`.
+    // spicetify/.config/spicetify/Extensions/frameshell.js, then run `facet update spicetify`.
     readonly property int spotifyPort: user.spotifyPort ?? 48931
 
     // Web search (?): engine without a shortcut, and the shortcuts. %s is the search text.
@@ -229,6 +229,6 @@ Singleton {
     // false: the keyboard app only shows what it would send (frame-keyboard dry run).
     // Set it to true once frame-keyboard works on your board (docs/keyboard.md); the switch
     // in the app changes it until the shell restarts. true also lights the Super keys while
-    // the hotkey overlay is open, and `frame theme set` puts the theme colors on the keys.
+    // the hotkey overlay is open, and `facet theme set` puts the theme colors on the keys.
     readonly property bool keyboardLive: user.keyboardLive ?? true
 }

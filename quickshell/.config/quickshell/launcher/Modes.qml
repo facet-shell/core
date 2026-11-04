@@ -322,7 +322,7 @@ Item {
 
     function discordRows(rest) {
         if (!DiscordBridge.connected)
-            return [info("Discord is not connected", "start Vesktop with the ShellBridge plugin (frame install vencord)")];
+            return [info("Discord is not connected", "start Vesktop with the ShellBridge plugin (facet install vencord)")];
         const words = rest.split(/\s+/);
         const first = words[0].toLowerCase();
 
@@ -519,7 +519,7 @@ Item {
 
     function emojiRows(rest) {
         if (!Emoji.available)
-            return [info("no emoji list", "data/emoji.tsv is missing from the shell folder (frame update quickshell)")];
+            return [info("no emoji list", "data/emoji.tsv is missing from the shell folder (facet update quickshell)")];
         const list = Emoji.search(rest);
         if (list.length === 0)
             return [info(rest === "" ? "type to search emoji" : "no emoji found", "# heart · # thumbs up · # cat")];

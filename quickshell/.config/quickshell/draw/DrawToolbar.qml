@@ -3,7 +3,7 @@ import qs.components
 import qs.config
 import "DrawEngine.js" as Engine
 
-// The drawing tools in the TUI frame look: a row (floating at the bottom of a screen) or a
+// The drawing tools in the TUI facet look: a row (floating at the bottom of a screen) or a
 // column (docked on the left). Tools, the theme's colors, four widths, then ruler, undo,
 // redo and clear. Hovering a button names it in the frame's label (row) or under the
 // buttons (column); `hint` has the whole text. Icons are the Nerd Font symbols

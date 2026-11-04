@@ -11,7 +11,7 @@ import qs.services
 // and gives the screens back; it is still there next time, also after a shell restart
 // (DrawDoc, draw.json). Super+Shift+P clears it. "click through" keeps the drawing on
 // screen while mouse and keys go to the windows; only the toolbar still takes clicks.
-// With the infinite canvas (frame layout canvas) the drawing lives in canvas coordinates
+// With the infinite canvas (facet layout canvas) the drawing lives in canvas coordinates
 // like the windows: it moves when the view moves, and right drag on it moves the view.
 // Without it, in layout coordinates (where the screens are).
 // Keys: the tool letters (p h l a r e t x), Ctrl+Z / Ctrl+Shift+Z, Esc hides.

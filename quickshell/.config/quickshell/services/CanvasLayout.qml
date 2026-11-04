@@ -6,7 +6,7 @@ import Quickshell.Io
 
 // CanvasLayout (not "Canvas": that name is QtQuick.Canvas). The infinite-canvas layout
 // (hypr/frame/canvas.lua) as the bar and the overview see it.
-// enabled: ~/.local/state/frameshell/layout says "canvas" (`frame layout canvas`).
+// enabled: ~/.local/state/frameshell/layout says "canvas" (`facet layout canvas`).
 // The rest comes from $XDG_RUNTIME_DIR/frame-canvas.json, which canvas.lua rewrites on
 // every change: { monitors: [{ name, focused, workspace, x, y, w, h, camera: { x, y } }],
 //   windows: [{ address, monitor, x, y, w, h, active, class, title }] }

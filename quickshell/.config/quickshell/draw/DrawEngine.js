@@ -315,7 +315,7 @@ function paintShapes(ctx, shapes, view, colorOf, family) {
     ctx.restore();
 }
 
-// The ruler in the theme's frame look; tick labels stay readable at any zoom (k)
+// The ruler in the theme's facet look; tick labels stay readable at any zoom (k)
 function paintRuler(ctx, r, view, colorOf, family) {
     var g = rulerGeom(r), u = 1 / view.k;
     ctx.save();

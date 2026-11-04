@@ -1239,13 +1239,13 @@ FocusScope {
                                 Action {
                                     visible: mod.isInstalled
                                     text: "update"
-                                    onClicked: root.inTerminal(`frame update ${mod.modelData[0]}`, [root.frameBin, "update", mod.modelData[0]])
+                                    onClicked: root.inTerminal(`facet update ${mod.modelData[0]}`, [root.frameBin, "update", mod.modelData[0]])
                                 }
                                 Action {
                                     visible: !mod.isInstalled
                                     text: "add"
                                     tint: Theme.primary
-                                    onClicked: root.inTerminal(`frame add ${mod.modelData[0]}`, [root.frameBin, "add", mod.modelData[0]])
+                                    onClicked: root.inTerminal(`facet add ${mod.modelData[0]}`, [root.frameBin, "add", mod.modelData[0]])
                                 }
                             }
                         }
@@ -1258,7 +1258,7 @@ FocusScope {
 
                             Action {
                                 text: "connect"
-                                onClicked: root.inTerminal("frame spotify login", [root.frameBin, "spotify", "login"])
+                                onClicked: root.inTerminal("facet spotify login", [root.frameBin, "spotify", "login"])
                             }
                         }
                         Setting {
@@ -1300,7 +1300,7 @@ FocusScope {
                                     parts.push(`${Updates.total} packages waiting (${Updates.aurCount} from the AUR)`);
                                 if (Updates.frameCount > 0)
                                     parts.push(`frameshell: ${Updates.frameList.map(r => `${r.name} ${r.from} → ${r.to}`).join(", ")}`);
-                                return parts.length > 0 ? `${parts.join("; ")}, then frame update` : "everything is up to date";
+                                return parts.length > 0 ? `${parts.join("; ")}, then facet update` : "everything is up to date";
                             }
 
                             Action {
@@ -1322,11 +1322,11 @@ FocusScope {
 
                             Action {
                                 text: "install"
-                                onClicked: root.inTerminal("frame boot install", [root.frameBin, "boot", "install"])
+                                onClicked: root.inTerminal("facet boot install", [root.frameBin, "boot", "install"])
                             }
                             Action {
                                 text: "remove"
-                                onClicked: root.inTerminal("frame boot remove", [root.frameBin, "boot", "remove"])
+                                onClicked: root.inTerminal("facet boot remove", [root.frameBin, "boot", "remove"])
                             }
                         }
 
@@ -1336,15 +1336,15 @@ FocusScope {
 
                             Action {
                                 text: "login screen"
-                                onClicked: root.inTerminal("frame login install", [root.frameBin, "login", "install"])
+                                onClicked: root.inTerminal("facet login install", [root.frameBin, "login", "install"])
                             }
                             Action {
                                 text: "auto"
-                                onClicked: root.inTerminal("frame login auto", [root.frameBin, "login", "auto"])
+                                onClicked: root.inTerminal("facet login auto", [root.frameBin, "login", "auto"])
                             }
                             Action {
                                 text: "distro's"
-                                onClicked: root.inTerminal("frame login remove", [root.frameBin, "login", "remove"])
+                                onClicked: root.inTerminal("facet login remove", [root.frameBin, "login", "remove"])
                             }
                         }
 
@@ -1354,11 +1354,11 @@ FocusScope {
 
                             Action {
                                 text: "status"
-                                onClicked: root.inTerminal("frame status", [root.frameBin, "status"])
+                                onClicked: root.inTerminal("facet status", [root.frameBin, "status"])
                             }
                             Action {
                                 text: "clean"
-                                onClicked: root.inTerminal("frame clean", [root.frameBin, "clean"])
+                                onClicked: root.inTerminal("facet clean", [root.frameBin, "clean"])
                             }
                         }
 

@@ -2,7 +2,7 @@
 # frameshell greeter session for greetd: the lockscreen's look as the login screen.
 # Quickshell draws it (greeter/shell.qml); the compositor underneath is the small one
 # CachyOS ships with noctalia-greeter, or cage when that is missing. Installed by
-# `frame login` to /usr/share/frameshell/greeter and set as greetd's default_session.
+# `facet login` to /usr/share/frameshell/greeter and set as greetd's default_session.
 set -u
 
 DIR="${FRAME_GREETER_DIR:-/usr/share/frameshell/greeter}"

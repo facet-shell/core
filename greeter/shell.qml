@@ -9,7 +9,7 @@ import qs.ui
 // one person who uses this machine. greetd runs it (frame-greeter-session) and starts the
 // session once the password is right. greeter.json next to this file says who and what:
 //   { "user": "name", "command": ["/usr/bin/start-hyprland"] }
-// Installed by `frame login`; `qs -p greeter` shows it inside a running desktop too (then
+// Installed by `facet login`; `qs -p greeter` shows it inside a running desktop too (then
 // greetd is not there and the field only says so).
 ShellRoot {
     id: root
@@ -42,7 +42,7 @@ ShellRoot {
             }
             root.begin();
         }
-        onLoadFailed: root.status = "no greeter.json · run: frame login"
+        onLoadFailed: root.status = "no greeter.json · run: facet login"
     }
 
     FileView {

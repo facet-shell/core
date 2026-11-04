@@ -6,7 +6,7 @@ import Quickshell.Wayland
 import qs.config
 import qs.services
 
-// Zoomed-out view of the infinite canvas (frame layout canvas) on the focused screen.
+// Zoomed-out view of the infinite canvas (facet layout canvas) on the focused screen.
 // Super+wheel down opens it: the desktop shrinks until every screen and every window is
 // in view, each window a live preview, each screen an outline. The screens stay where
 // they are (layout coordinates): moving a view moves its windows across the map, the

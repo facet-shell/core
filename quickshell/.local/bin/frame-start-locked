@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# frame-start-locked – locks the session at Hyprland's start after `frame login auto`.
+# frame-start-locked – locks the session at Hyprland's start after `facet login auto`.
 #
 # With [initial_session] greetd logs in at boot without asking for a password, so the shell's
 # lockscreen has to be up before anyone can use the desktop. It fails closed: when the lock is

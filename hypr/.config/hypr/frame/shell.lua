@@ -1,5 +1,5 @@
 -- frameshell for Hyprland (Lua config, Hyprland 0.55+): autostart, shell keybinds, idle.
--- Loaded from your own hyprland.lua with require("frame/shell"); `frame install hypr`
+-- Loaded from your own hyprland.lua with require("frame/shell"); `facet install hypr`
 -- adds that line. Descriptions show up in the hotkey overlay (hold Super).
 
 -- Quickshell runs bar, launcher, lockscreen and the rest (also the idle lock and screen
@@ -14,7 +14,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --watch ~/.local/bin/frame-clip store")
     -- GoXLR faders and mutes for the shell; does nothing without GoXLR Utility
     hl.exec_cmd("command -v goxlr-daemon >/dev/null && goxlr-daemon")
-    -- `frame login auto`: greetd logs in without a greeter, so the session starts locked and
+    -- `facet login auto`: greetd logs in without a greeter, so the session starts locked and
     -- the shell's lockscreen asks for the password instead; without the lock the session
     -- ends (quickshell/.local/bin/frame-start-locked). Only here, at Hyprland's start, never
     -- when the shell alone restarts.
@@ -202,7 +202,7 @@ hl.config({
 require("frame/apps")
 require("frame/hotkeys")
 
--- Layout picked in `frame install` or with `frame layout tiling|canvas`; the normal
+-- Layout picked in `facet install` or with `facet layout tiling|canvas`; the normal
 -- tiling needs nothing, the infinite canvas lives in frame/canvas.lua
 local function layout()
     local home = os.getenv("XDG_STATE_HOME") or ((os.getenv("HOME") or "") .. "/.local/state")
@@ -217,5 +217,5 @@ end
 if layout() == "canvas" then
     require("frame/canvas")
 end
--- Written by `frame theme`; missing until the first run, which must not stop the rest
+-- Written by `facet theme`; missing until the first run, which must not stop the rest
 pcall(require, "frame/colors")

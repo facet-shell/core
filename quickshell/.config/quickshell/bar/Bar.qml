@@ -359,7 +359,7 @@ Scope {
 
                             Bracket { text: "[" }
 
-                            // Infinite canvas (frame layout canvas): a minimap instead of workspaces
+                            // Infinite canvas (facet layout canvas): a minimap instead of workspaces
                             CanvasMap {
                                 visible: CanvasLayout.enabled
                                 monitor: window.shellScreen.name
@@ -510,7 +510,7 @@ Scope {
 
                             // Package and frameshell updates (services/Updates.qml): only there when
                             // there are some; hovering names the frameshell repos that are behind.
-                            // Click runs them in Ghostty (only `frame update` when no package waits).
+                            // Click runs them in Ghostty (only `facet update` when no package waits).
                             Bracket { text: "─["; visible: updatesItem.visible }
                             Item {
                                 id: updatesItem
@@ -541,8 +541,8 @@ Scope {
                                     }
                                     Label {
                                         visible: !Updates.updating && Updates.frameCount > 0
-                                        text: updatesHover.hovered ? `frame ${Updates.frameList.map(r => r.name).join(" ")}`
-                                            : Updates.total > 0 ? `frame ${Updates.frameCount}` : `↑ frame ${Updates.frameCount}`
+                                        text: updatesHover.hovered ? `facet ${Updates.frameList.map(r => r.name).join(" ")}`
+                                            : Updates.total > 0 ? `facet ${Updates.frameCount}` : `↑ facet ${Updates.frameCount}`
                                         color: Theme.warn
                                     }
                                 }

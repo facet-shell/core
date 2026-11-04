@@ -16,7 +16,7 @@ import qs.config
 //   3. MPRIS: controls and playing a spotify: link work without either of the above
 // Non-Spotify players (browser, mpv) are controlled over MPRIS when Spotify is not running.
 //
-// The extension proves itself with the token `frame install spicetify` writes to
+// The extension proves itself with the token `facet install spicetify` writes to
 // ~/.local/state/frameshell/spotify-bridge.token, so a web page that connects to the
 // port cannot pose as Spotify and read what you search.
 //
@@ -118,7 +118,7 @@ Singleton {
             bridgeWait.restart();
         } else
             done(false, spotifyPlayer
-                ? "Spotify runs, but the Spicetify extension is not connected (frame install spicetify, then restart Spotify)"
+                ? "Spotify runs, but the Spicetify extension is not connected (facet install spicetify, then restart Spotify)"
                 : "Spotify is not running");
     }
 
@@ -218,7 +218,7 @@ Singleton {
         }
         if (msg.hello === "frameshell") {
             if (token === "" || msg.token !== token) {
-                console.warn("spotify: extension sent a wrong token, run `frame install spicetify` again");
+                console.warn("spotify: extension sent a wrong token, run `facet install spicetify` again");
                 ws.active = false;
                 return;
             }

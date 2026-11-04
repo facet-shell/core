@@ -1,7 +1,7 @@
 -- Infinite canvas: instead of tiling into workspaces, every window floats on one endless
 -- plane per workspace and the screen is a camera you move over it. Loaded from
 -- frame/shell.lua when ~/.local/state/frameshell/layout says "canvas"
--- (`frame layout canvas`, or the question in `frame install`).
+-- (`facet layout canvas`, or the question in `facet install`).
 --
 -- Hyprland has no camera, so moving the view moves every window of the workspace the
 -- other way; the normal window animation makes that glide. A window's place on the
@@ -700,7 +700,7 @@ local function float_all()
     snapshot()
 end
 
--- Before `frame layout tiling`: big windows tile again, small ones (dialogs) keep floating
+-- Before `facet layout tiling`: big windows tile again, small ones (dialogs) keep floating
 local function release()
     -- Every canvas back to its start first, so the windows that keep floating (dialogs)
     -- are on screen again and not where some camera left them

@@ -3,7 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.services
 
-// The desk behind the windows (frame layout canvas): a see-through layer on every screen
+// The desk behind the windows (facet layout canvas): a see-through layer on every screen
 // that only the empty canvas lets clicks through to. Dragging it with the left or middle
 // button moves the view, the wheel moves it too (Shift: sideways). Hyprland handles
 // Super + mouse on its own, so this never sees those.

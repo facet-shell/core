@@ -8,7 +8,7 @@ import qs.config
 // Package updates for the bar: repository ones the way checkupdates finds them (it
 // syncs into a temporary database, so nothing changes on the system) and AUR ones from
 // paru or yay. Checked a minute after start and then every 30 minutes; a click on the
-// number opens Ghostty with the update and `frame update`, and checks again when it closes.
+// number opens Ghostty with the update and `facet update`, and checks again when it closes.
 // frameshell itself (the CLI and the module clones) is checked on the same schedule,
 // unless Config.frameUpdates is off.
 //
