@@ -105,6 +105,11 @@ Singleton {
     // as a factor, and whether they open smaller while game mode is on
     readonly property real panelSize: user.panelSize ?? 1
     readonly property bool panelsCompactInGame: user.panelsCompactInGame ?? true
+    // The organisations the dashboard's GitHub tab offers next to "you"
+    readonly property var githubOrgs: user.githubOrgs ?? ["facet-shell"]
+    // The pill that shows a screen recording runs (rec m:ss, a click stops it), and where
+    readonly property bool recordIndicator: user.recordIndicator ?? true
+    readonly property string recordIndicatorPosition: user.recordIndicatorPosition ?? "top-left"
 
     // ── Notifications ────────────────────────────────────────
 
