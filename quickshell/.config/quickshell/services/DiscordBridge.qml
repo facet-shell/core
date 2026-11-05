@@ -24,6 +24,8 @@ import qs.config
 //   { type: "voice_state", channelId (empty: in no voice channel), channel, guild,
 //     members: [{ userId, name, avatar, you, muted, deafened, streaming, speaking }] }   (for the overlay)
 //   { type: "speaking", userId, speaking }
+//   { type: "stream", live, viewers: [{ id, name, avatar }] }   (your own Go Live stream and who watches it;
+//     sent on every change and after voice_state)
 // shell → Discord:
 //   { cmd: "accept_call" | "decline_call" | "call_back" | "join_voice" | "leave_voice" | "open_channel"
 //     | "toggle_mute" | "toggle_deafen" | "voice_state", channelId?, guildId? }
@@ -47,6 +49,10 @@ Singleton {
     property var voice: noVoice
     property var speaking: ({})
     readonly property bool inVoice: connected && voice.channelId !== ""
+
+    // Your own Go Live stream: whether it runs and who watches it ({ id, name, avatar }, by name)
+    property bool streamLive: false
+    property var streamViewers: []
 
     // The overlay is on screen (Config.voiceOverlayWhen); then joins, leaves and your mute
     // go there instead of, or as well as, a notification (Config.voiceOverlayFeed)
@@ -73,6 +79,43 @@ Singleton {
             if (m.speaking)
                 next[m.userId] = true;
         speaking = next;
+    }
+
+    // Viewers coming and going get a line like joins and leaves. The stream starting or ending
+    // stays quiet: its viewers all arrive or go with it, that is not news.
+    function setStream(event) {
+        const live = event.live === true;
+        const viewers = event.viewers ?? [];
+        if (live && streamLive) {
+            const before = new Set(streamViewers.map(v => v.id));
+            const after = new Set(viewers.map(v => v.id));
+            for (const v of viewers)
+                if (!before.has(v.id))
+                    viewerLine(v, true, viewers.length);
+            for (const v of streamViewers)
+                if (!after.has(v.id))
+                    viewerLine(v, false, viewers.length);
+        }
+        streamLive = live;
+        streamViewers = viewers;
+    }
+
+    // Same way as a join or leave in your channel: the overlay's feed while it shows, a
+    // notification under dc.voice unless Config.voiceOverlayFeed keeps it to the overlay
+    function viewerLine(viewer, watching, count) {
+        const name = viewer.name || "someone";
+        if (feedsOverlay)
+            voiceLine(`${watching ? "◉" : "○"} ${name} ${watching ? "is watching your stream" : "stopped watching"}`, watching ? "in" : "out");
+        if (overlayOnly)
+            return;
+        Notifications.push({
+            app: "discord · voice",
+            rule: "dc.voice",
+            kind: "voice",
+            title: `${name} ${watching ? "is watching your stream" : "stopped watching your stream"}`,
+            body: `${count} watching`,
+            image: viewer.avatar ?? ""
+        });
     }
 
     function refreshContacts() {
@@ -251,6 +294,9 @@ Singleton {
         case "voice_state":
             root.setVoice(event);
             break;
+        case "stream":
+            root.setStream(event);
+            break;
         case "speaking": {
             const next = Object.assign({}, speaking);
             if (event.speaking)
@@ -295,6 +341,8 @@ Singleton {
                     if (root.clients.length === 0) {
                         root.voice = root.noVoice;
                         root.speaking = {};
+                        root.streamLive = false;
+                        root.streamViewers = [];
                     }
                 }
             }
