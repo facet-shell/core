@@ -71,6 +71,11 @@ Singleton {
     // Lock after this many minutes without input, screens off after that many; 0: never
     readonly property int idleLockMinutes: user.idleLockMinutes ?? 0
     readonly property int idleScreenOffMinutes: user.idleScreenOffMinutes ?? 0
+    // Ambient lockscreen (bloom): after this many minutes without input on the lockscreen the
+    // clock shrinks and drifts slowly, the blur goes up and the rest fades; any key or the
+    // mouse brings it back. Off by default.
+    readonly property bool lockAmbient: user.lockAmbient ?? false
+    readonly property int lockAmbientMinutes: user.lockAmbientMinutes ?? 1
 
     // How long a notification stays when the app does not say (ms), and how many show at once
     readonly property int notificationTimeout: user.notificationTimeout ?? 5000
@@ -159,6 +164,11 @@ Singleton {
     // card (frame, picture, buttons, time left), line (one line) or minimal (who and what)
     readonly property string notificationStyle: user.notificationStyle ?? "card"
     readonly property int notificationWidth: user.notificationWidth ?? 460
+    // Popups from the same app stack behind the newest one with a count; a click opens the
+    // stack. Off: every popup on its own, as before.
+    readonly property bool notificationGroupByApp: user.notificationGroupByApp ?? true
+    // Discord messages get a reply field right in the card (sent through the Discord bridge)
+    readonly property bool notificationInlineReply: user.notificationInlineReply ?? true
 
     // The Spotify popup: same positions; wide (cover beside the song), tall (big cover on
     // top) or strip (one thin line); size as a factor; seconds it stays
@@ -166,6 +176,9 @@ Singleton {
     readonly property string spotifyFormat: user.spotifyFormat ?? "wide"
     readonly property real spotifySize: user.spotifySize ?? 1
     readonly property int spotifySeconds: user.spotifySeconds ?? 6
+    // bloom: the music parts (the Spotify popup, the dashboard's media card, the lockscreen's
+    // music) take their accent from the album cover instead of the theme
+    readonly property bool albumColors: user.albumColors ?? true
 
     // The Discord voice overlay while you are in a voice channel: when it shows ("always",
     // "hidden": Discord on no screen, "game": while game mode is on, "never"); list, compact
