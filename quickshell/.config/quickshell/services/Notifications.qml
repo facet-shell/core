@@ -209,4 +209,41 @@ Singleton {
         const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
         return minutes < 1 ? "now" : minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h`;
     }
+
+    // ── Grouping by app (Config.notificationGroupByApp) ──────
+
+    // Popups and history rows of one app fold into a stack; the key is the entry's app name.
+    // Ringing calls and alarms keep a group of their own: they must not hide under a stack.
+    function groupKey(entry) {
+        return urgent(entry) ? `uid:${entry.uid}` : (entry.app || "app").toLowerCase();
+    }
+
+    // [{ key, entries: [newest, …] }] in the order of each group's first entry. The lists
+    // are newest first, so the first of a group is its newest. With the switch off every
+    // entry is a group of its own, so the order is the list's own.
+    function groups(list) {
+        const out = [];
+        const byKey = {};
+        for (const entry of list) {
+            const key = Config.notificationGroupByApp ? groupKey(entry) : `uid:${entry.uid}`;
+            let group = byKey[key];
+            if (!group) {
+                group = { key, entries: [] };
+                byKey[key] = group;
+                out.push(group);
+            }
+            group.entries.push(entry);
+        }
+        return out;
+    }
+
+    // uid → { index (0: the newest, in front), size, key } for every entry of the list
+    function places(list) {
+        const out = {};
+        for (const group of groups(list))
+            group.entries.forEach((entry, index) => {
+                out[entry.uid] = { index, size: group.entries.length, key: group.key };
+            });
+        return out;
+    }
 }

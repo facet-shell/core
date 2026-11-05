@@ -28,7 +28,7 @@ import qs.config
 //   { cmd: "accept_call" | "decline_call" | "call_back" | "join_voice" | "leave_voice" | "open_channel"
 //     | "toggle_mute" | "toggle_deafen" | "voice_state", channelId?, guildId? }
 //   { cmd: "list_contacts" } | { cmd: "open_dm" | "call_user", userId, channelId? } | { cmd: "send_dm", userId, content, channelId? }
-//   | { cmd: "reply_last", content }
+//   | { cmd: "reply_last", content } | { cmd: "send_message", channelId, content }   (a notification's reply field)
 Singleton {
     id: root
 
@@ -93,6 +93,12 @@ Singleton {
         }
     }
 
+    // A reply typed into a message's notification goes straight into that channel (a DM, a
+    // group or a server channel); the plugin answers with a "sent" event like the launcher's DMs
+    function reply(channelId, content) {
+        send({ cmd: "send_message", channelId, content });
+    }
+
     // A ringing call stopped: the card goes away and its history entry says how it ended.
     // A missed call also gets a short notice with "call back".
     function callEnded(event) {
@@ -143,13 +149,19 @@ Singleton {
             // You are in Discord already: the message is on screen (Config.discordMessagesWhen)
             if (!Notifications.messageShows(Config.discordMessagesWhen, "vesktop"))
                 break;
+            // With a channel the card can answer in place (Config.notificationInlineReply);
+            // where there is no field (history, in-game pill, other looks) "reply" opens
+            // the channel like "open"
             Notifications.push({
                 app: "discord",
                 rule: event.kind === "server" ? "dc.mention" : "dc.dm",
                 title: root.messageTitle(event),
                 body: event.content,
                 image: event.avatar ?? "",
-                actions: [{ id: "open", label: "open", style: "" }],
+                replyChannel: event.channelId ?? "",
+                replyTo: event.kind === "group" ? event.channel : event.kind === "server" ? `#${event.channel}` : event.author,
+                actions: (Config.notificationInlineReply && event.channelId ? [{ id: "reply", label: "reply", style: "" }] : [])
+                    .concat([{ id: "open", label: "open", style: "" }]),
                 onAction: () => {
                     root.send({ cmd: "open_channel", channelId: event.channelId, guildId: event.guildId });
                     root.focusWindow();
