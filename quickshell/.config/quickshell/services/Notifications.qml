@@ -15,7 +15,8 @@ import qs.config
 //   rule (which of Config.notifyRules decides, e.g. "dc.call"; none: the shell's own notices, always shown),
 //   critical, timeout (ms, 0 = stays until handled), time, actions: [{ id, label, style }],
 //   notification (D-Bus object or null), onAction(id), callChannel,
-//   logged (false = popup only, e.g. a missed-call notice whose call is already in the history) }
+//   logged (false = popup only, e.g. a missed-call notice whose call is already in the history),
+//   preview (true = a test from the settings: shows past the rules and the bell, not logged) }
 Singleton {
     id: root
 
@@ -131,10 +132,19 @@ Singleton {
             notification: null,
             onAction: null,
             callChannel: "",
-            logged: true
+            logged: true,
+            preview: false
         }, entry);
         if (!entry.glyph)
             full.glyph = (full.title || full.app).charAt(0).toUpperCase();
+
+        // A preview (the settings' "Try it") shows no matter what the rules and the bell say
+        // and stays out of the history
+        if (full.preview) {
+            full.logged = false;
+            popups = [full].concat(popups).slice(0, Config.notificationsMax);
+            return;
+        }
 
         // Turned off under the rules: not even in the bell
         if (!full.critical && ruleFor(full.rule) === "never")
