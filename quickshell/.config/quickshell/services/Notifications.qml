@@ -109,7 +109,8 @@ Singleton {
     // screen counts, Discord on another workspace does not)
     function onScreen(appId) {
         const id = appId.toLowerCase();
-        const shown = Hyprland.monitors.values.flatMap(m => [m.activeWorkspace?.id, m.specialWorkspace?.id])
+        // Qt's JS engine has no flatMap
+        const shown = [].concat(...Hyprland.monitors.values.map(m => [m.activeWorkspace?.id, m.specialWorkspace?.id]))
             .filter(w => w !== undefined && w !== 0);
         return Hyprland.toplevels.values.some(t => shown.includes(t.workspace?.id)
             && String(t.wayland?.appId ?? t.lastIpcObject?.class ?? "").toLowerCase() === id);
@@ -184,6 +185,9 @@ Singleton {
         if (entry?.onAction)
             entry.onAction(actionId);
         dismiss(uid, false);
+        // An action is the answer to it: the row leaves the history too (a deleted
+        // screenshot's card stayed, so "delete" looked like it did nothing)
+        history = history.filter(h => h.uid !== uid);
     }
 
     function removeWhere(test) {
