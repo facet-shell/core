@@ -960,7 +960,7 @@ local function overview(open)
     end
 end
 
--- For the bar (minimap), the overview and facet: hyprctl eval 'frame_canvas.look_at(0, 0)'
+-- For the bar (minimap), the overview and frame: hyprctl eval 'frame_canvas.look_at(0, 0)'
 frame_canvas = {
     overview = overview,
     pan = pan,
