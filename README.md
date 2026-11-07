@@ -75,3 +75,8 @@ python3 tests/glint/run-smoke.py --tui /path/to/style-tui
 
 These checks use an asynchronous fake transport; visual rendering and desktop
 compositor behavior still need a real-session check.
+
+Glint has a dedicated Hyprland layer rule (`^glint$`, `no_anim = true`). Its own
+wallpaper transitions remain in the renderer; compositor layer fades can leave a
+background transparent when it was mapped behind fullscreen content. Existing
+sessions need a Hyprland reload and Glint restart to pick up the integration change.

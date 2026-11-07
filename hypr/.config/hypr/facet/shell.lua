@@ -2,6 +2,13 @@
 -- Loaded from your own hyprland.lua with require("facet/shell"); `facet install hypr`
 -- adds that line. Descriptions show up in the hotkey overlay (hold Super).
 
+-- Glint handles wallpaper transitions itself; compositor fades can hide a background layer.
+hl.layer_rule({
+    name = "facet-glint",
+    match = { namespace = "^glint$" },
+    no_anim = true,
+})
+
 -- Quickshell runs bar, launcher, lockscreen and the rest (also the idle lock and screen
 -- off, lockscreen/Lock.qml); glint starts the selected wallpaper;
 -- facet-clip keeps what you copy for the launcher
