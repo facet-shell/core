@@ -104,8 +104,8 @@ take("SUPER + SHIFT + D", shell("voice", "deafen"), { description = "facet shell
 take("ALT + Tab", function()
     hl.dispatch(hl.dsp.window.cycle_next())
     hl.dispatch(hl.dsp.window.bring_to_top())
-end, { description = "frame windows · next window, brought up" })
-take("SUPER + ALT + B", hl.dsp.window.alter_zorder({ mode = "bottom" }), { description = "frame windows · window to the back" })
+end, { description = "facet windows · next window, brought up" })
+take("SUPER + ALT + B", hl.dsp.window.alter_zorder({ mode = "bottom" }), { description = "facet windows · window to the back" })
 
 -- Steam games and gamescope get a workspace of their own from the distro's rules
 -- (config/windowrules.lua: name:gaming) and the screen switches to it, so the desktop is out
@@ -177,7 +177,7 @@ hl.on("window.open", function(w)
         end, { timeout = 50, type = "oneshot" })
     end
 end)
-take("SUPER + Tab", frame_games.toggle, { description = "frame windows · games ↔ desktop (Steam games run on their own workspace)" })
+take("SUPER + Tab", frame_games.toggle, { description = "facet windows · games ↔ desktop (Steam games run on their own workspace)" })
 take("SUPER + ALT + S", function()
     local w = hl.get_active_window()
     if not w then
@@ -191,7 +191,7 @@ take("SUPER + ALT + S", function()
     else
         hl.dispatch(hl.dsp.window.move({ workspace = "special" }))
     end
-end, { description = "frame windows · window into the scratchpad and back (Super+S shows it)" })
+end, { description = "facet windows · window into the scratchpad and back (Super+S shows it)" })
 
 hl.config({
     misc = {

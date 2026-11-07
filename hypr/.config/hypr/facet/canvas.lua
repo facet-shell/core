@@ -870,7 +870,7 @@ local function bind(keys, fn, text)
             pcall(hl.unbind, spelling)
         end
     end
-    hl.bind(keys, fn, { description = "frame canvas · " .. text })
+    hl.bind(keys, fn, { description = "facet canvas · " .. text })
 end
 
 for _, name in ipairs({ "left", "right", "up", "down" }) do

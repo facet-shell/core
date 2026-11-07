@@ -16,10 +16,10 @@ local function take(keys, dispatcher, opts)
     return hl.bind(keys, dispatcher, opts)
 end
 
-take("SUPER + E", hl.dsp.exec_cmd("dolphin"), { description = "frame apps · Dolphin" })
-take("SUPER + B", hl.dsp.exec_cmd("zen-browser"), { description = "frame apps · Zen" })
+take("SUPER + E", hl.dsp.exec_cmd("dolphin"), { description = "facet apps · Dolphin" })
+take("SUPER + B", hl.dsp.exec_cmd("zen-browser"), { description = "facet apps · Zen" })
 -- Programs that ask for $BROWSER (gh auth login, xdg-open fallbacks) get Zen, not the
 -- distro's firefox; the autostart pushes Hyprland's environment to systemd, so
 -- terminals opened later see it too
 hl.env("BROWSER", "zen-browser")
-take("SUPER + SHIFT + E", hl.dsp.exec_cmd("zeditor"), { description = "frame apps · Zed" })
+take("SUPER + SHIFT + E", hl.dsp.exec_cmd("zeditor"), { description = "facet apps · Zed" })
