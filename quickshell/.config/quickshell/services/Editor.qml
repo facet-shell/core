@@ -34,7 +34,7 @@ Singleton {
 
     // A blank PNG in <pictures>/paintings, opened in the picture editor once it is there.
     // ffmpeg (a dependency anyway) makes it, so nothing new is needed. "new" in the media
-    // app, `qs ipc call editor paint`, the launcher (frameshell-paint.desktop).
+    // app, `qs ipc call editor paint`, the launcher (facet-paint.desktop).
     function newPicture(paper, width, height) {
         if (paintProc.running)
             return;
@@ -49,7 +49,7 @@ Singleton {
             'dir=$(xdg-user-dir PICTURES 2>/dev/null); [ -n "$dir" ] && [ "$dir" != "$HOME" ] || dir=$HOME/Pictures; '
             + 'dir=$dir/paintings; mkdir -p "$dir" && f=$dir/painting-$2.png && '
             + 'ffmpeg -y -nostdin -v error -f lavfi -i "$1" -frames:v 1 "$f" && printf %s "$f"',
-            "frame-paint", source, stamp];
+            "facet-paint", source, stamp];
         paintProc.running = true;
     }
 

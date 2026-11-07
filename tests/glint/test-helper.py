@@ -10,10 +10,10 @@ root = pathlib.Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix='facet-glint-helper-') as directory:
     task_root = pathlib.Path(directory)
     state = task_root / 'state'
-    (state / 'frameshell').mkdir(parents=True)
+    (state / 'facet').mkdir(parents=True)
     old = {'fps': 144, 'volume': 25, 'scaling': 'fit', 'backend': 'image',
            'screens': {'*': {'path': '/test/a b', 'kind': 'scene'}, 'DP-2': {'path': '/test/video', 'kind': 'video'}}}
-    legacy = state / 'frameshell/wallpaper.json'
+    legacy = state / 'facet/wallpaper.json'
     legacy.write_text(json.dumps(old))
     original = legacy.read_bytes()
     executable = task_root / 'glint'
@@ -24,7 +24,7 @@ if [ "$1" = outputs ]; then [ "${FACET_TEST_RUNNING:-0}" = 1 ]; exit $?; fi
 ''')
     executable.chmod(0o755)
     helper = task_root / 'start'
-    helper.write_text((root / 'wallpaper/.local/bin/frame-glint-start').read_text().replace('glint="$HOME/.local/bin/glint"', 'glint="' + str(executable) + '"'))
+    helper.write_text((root / 'wallpaper/.local/bin/facet-glint-start').read_text().replace('glint="$HOME/.local/bin/glint"', 'glint="' + str(executable) + '"'))
     env = dict(os.environ, XDG_STATE_HOME=str(state), WAYLAND_DISPLAY='/tmp/wayland-9', FACET_TEST_GLINT_LOG=str(task_root / 'calls'))
     subprocess.run(['bash', str(helper)], env=env, check=True)
     new = state / 'glint/state-wayland-9.json'
@@ -47,7 +47,7 @@ if [ "$1" = outputs ]; then [ "${FACET_TEST_RUNNING:-0}" = 1 ]; exit $?; fi
     (tools / 'ffmpeg').write_text('#!/bin/sh\nexit 1\n')
     (tools / 'ffmpeg').chmod(0o755)
     env.update(WALLPAPER_DIR=str(pictures), XDG_DATA_HOME=str(task_root / 'data'), XDG_CACHE_HOME=str(task_root / 'cache'), PATH=str(tools) + ':' + os.environ['PATH'])
-    result = subprocess.run(['bash', str(root / 'wallpaper/.local/bin/frame-wallpaper'), 'list-local'], env=env, check=True, capture_output=True, text=True)
+    result = subprocess.run(['bash', str(root / 'wallpaper/.local/bin/facet-wallpaper'), 'list-local'], env=env, check=True, capture_output=True, text=True)
     items = json.loads(result.stdout)
     assert {item['kind'] for item in items} == {'image', 'video'}, items
     print('Glint migration, existing-daemon reuse and local-file listing passed')

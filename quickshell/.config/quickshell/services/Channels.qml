@@ -9,7 +9,7 @@ import qs.config
 // Puts apps on the virtual channels (`facet audio channels on`) when they start playing:
 // Config.audioRules ([pattern, channel], first match wins; "@game" is the game that runs, as
 // game mode sees it) and what you chose in the app mixer, which always wins over the rules
-// (kept in ~/.local/state/frameshell/audio-routes.json). Only while the virtual channels are
+// (kept in ~/.local/state/facet/audio-routes.json). Only while the virtual channels are
 // the channels in use (Audio.virtualActive) and Config.audioRulesOn; never with a GoXLR or
 // without channels, so nothing moves there that did not move before.
 //
@@ -221,7 +221,7 @@ Singleton {
 
     FileView {
         id: memoryView
-        path: `${Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state"}/frameshell/audio-routes.json`
+        path: `${Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state"}/facet/audio-routes.json`
         printErrors: false
         JsonAdapter {
             id: memory

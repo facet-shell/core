@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# frame-wallpaper – wallpaper backends for the frameshell desktop
+# facet-wallpaper – wallpaper backends for the facet desktop
 #
 # The Quickshell wallpaper app (Super+W) is only a front end for this script, and Hyprland
-# runs `frame-wallpaper apply` at login. State: ${XDG_STATE_HOME:-~/.local/state}/frameshell/wallpaper.json
+# runs `facet-wallpaper apply` at login. State: ${XDG_STATE_HOME:-~/.local/state}/facet/wallpaper.json
 #
 # Backends ("backend" in the state, asked once by `facet install`):
 #   both   Wallpaper Engine scenes and videos from the Steam Workshop (linux-wallpaperengine),
@@ -12,37 +12,37 @@
 # Wallpaper folders: ~/Pictures/wallpapers (or $WALLPAPER_DIR) and assets/wallpapers in the repo.
 #
 # Usage:
-#   frame-wallpaper list                      JSON list of everything the backend can show
-#   frame-wallpaper state                     current state as JSON
-#   frame-wallpaper set <path> [screen]       set a wallpaper on one screen ("*" = all) and apply
-#   frame-wallpaper option <key> <value>      fps <n> | volume <0-100> | scaling fill|fit | pause true|false
+#   facet-wallpaper list                      JSON list of everything the backend can show
+#   facet-wallpaper state                     current state as JSON
+#   facet-wallpaper set <path> [screen]       set a wallpaper on one screen ("*" = all) and apply
+#   facet-wallpaper option <key> <value>      fps <n> | volume <0-100> | scaling fill|fit | pause true|false
 #                                           mature true|false (Workshop items rated Mature in the list)
-#   frame-wallpaper backend [both|mpv|image]  show or change the backend ("engine" means both)
-#   frame-wallpaper apply                     (re)start the backends from the state
-#   frame-wallpaper pause | resume            freeze the backends (the lockscreen does this) and
+#   facet-wallpaper backend [both|mpv|image]  show or change the backend ("engine" means both)
+#   facet-wallpaper apply                     (re)start the backends from the state
+#   facet-wallpaper pause | resume            freeze the backends (the lockscreen does this) and
 #                                             let them run again (Wallpaper Engine is restarted
 #                                             when it stands still afterwards)
-#   frame-wallpaper stop
+#   facet-wallpaper stop
 #
 # A switch keeps the old wallpaper until the new one has drawn its first frame, in the
 # background: set returns at once, and the next click makes a switch still waiting give way.
-# Timing of every switch goes to the log: ${XDG_STATE_HOME:-~/.local/state}/frameshell/wallpaper.log
+# Timing of every switch goes to the log: ${XDG_STATE_HOME:-~/.local/state}/facet/wallpaper.log
 #
 # linux-wallpaperengine flags follow its README.
 set -euo pipefail
 
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/frameshell"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/facet"
 STATE="$STATE_DIR/wallpaper.json"
 LOG="$STATE_DIR/wallpaper.log"
-CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/frameshell/wallpapers"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/facet/wallpapers"
 WORKSHOP="${WALLPAPER_WORKSHOP:-${XDG_DATA_HOME:-$HOME/.local/share}/Steam/steamapps/workshop/content/431960}"
 # Your own wallpapers next to the folder in Pictures (frame keeps them outside every repo)
-ASSETS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/frameshell/assets"
+ASSETS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/facet/assets"
 FOLDERS=("${WALLPAPER_DIR:-$HOME/Pictures/wallpapers}" "$ASSETS_DIR/wallpapers")
 DEFAULT_STATE='{"backend":"both","fps":30,"volume":0,"scaling":"fill","pause":true,"mature":true,"screens":{}}'
 
 die() {
-    echo "frame-wallpaper: $*" >&2
+    echo "facet-wallpaper: $*" >&2
     exit 1
 }
 
@@ -168,12 +168,12 @@ cmd_list() {
 # ── Backends ──────────────────────────────────────────────────
 
 RUN_DIR="${XDG_RUNTIME_DIR:-/tmp}"
-PAUSED_MARK="$RUN_DIR/frame-wallpaper-paused"
+PAUSED_MARK="$RUN_DIR/facet-wallpaper-paused"
 # Changes to the backends run one at a time under this lock (see take_ticket)
-LOCK="$RUN_DIR/frame-wallpaper.lock"
-TICKET="$RUN_DIR/frame-wallpaper.ticket"
+LOCK="$RUN_DIR/facet-wallpaper.lock"
+TICKET="$RUN_DIR/facet-wallpaper.ticket"
 # A change that was saved but not shown yet (it gave way to a pause, say); resume shows it
-PENDING="$RUN_DIR/frame-wallpaper-pending"
+PENDING="$RUN_DIR/facet-wallpaper-pending"
 # "<ticket> <outcome>" once a switch has ended; the shell's backdrop keeps the previous
 # picture up until then, so a scene that is still loading has something under it
 SHOWN="$STATE_DIR/wallpaper.shown"
@@ -562,7 +562,7 @@ cmd_stop() {
 
 cmd_set() {
     local path=${1:-} screen=${2:-*} kind
-    [[ -n $path ]] || die "usage: frame-wallpaper set <path> [screen]"
+    [[ -n $path ]] || die "usage: facet-wallpaper set <path> [screen]"
     [[ -e $path ]] || die "not found: $path"
     path="$(readlink -f "$path")"
     kind="$(kind_of "$path")"

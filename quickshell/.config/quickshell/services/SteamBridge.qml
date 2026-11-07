@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 
-// Unix socket the Millennium plugin (steam/.local/share/millennium/plugins/frameshell) connects to. Steam's own
+// Unix socket the Millennium plugin (steam/.local/share/millennium/plugins/facet) connects to. Steam's own
 // toasts are switched off while the plugin is connected; it sends them here instead.
 // One JSON object per line in both directions.
 //

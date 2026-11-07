@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# frame-clip – clipboard history for the launcher (;, Super+V), instead of cliphist.
+# facet-clip – clipboard history for the launcher (;, Super+V), instead of cliphist.
 #
-# Hyprland runs `wl-paste --watch frame-clip store` (hypr/frame/shell.lua): every copy becomes
-# one file in ~/.cache/frameshell/clipboard (only you can read the folder), the newest 100
+# Hyprland runs `wl-paste --watch facet-clip store` (hypr/facet/shell.lua): every copy becomes
+# one file in ~/.cache/facet/clipboard (only you can read the folder), the newest 100
 # stay, and copying something that is already there moves it to the top instead of storing
 # it twice. What password managers mark as secret is not kept.
 #
-#   frame-clip store         read the new clipboard (from wl-paste --watch)
-#   frame-clip list          newest first, one line each: <id> TAB <kind> TAB <preview>
+#   facet-clip store         read the new clipboard (from wl-paste --watch)
+#   facet-clip list          newest first, one line each: <id> TAB <kind> TAB <preview>
 #                            (kind: txt, png, jpg, webp, gif; the preview of a text has its
 #                            line breaks as \x1f, a picture's is its size)
-#   frame-clip copy <id>     put an entry back into the clipboard
-#   frame-clip delete <id>   forget one
-#   frame-clip clear         forget all
+#   facet-clip copy <id>     put an entry back into the clipboard
+#   facet-clip delete <id>   forget one
+#   facet-clip clear         forget all
 set -euo pipefail
 
-DIR="${XDG_CACHE_HOME:-$HOME/.cache}/frameshell/clipboard"
+DIR="${XDG_CACHE_HOME:-$HOME/.cache}/facet/clipboard"
 MAX=100
 
 mime_of() {

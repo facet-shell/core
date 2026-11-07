@@ -129,11 +129,11 @@ Singleton {
         });
     }
 
-    // frame-wallpaper pause|resume (wallpaper package); nothing happens without it
+    // facet-wallpaper pause|resume (wallpaper package); nothing happens without it
     function wallpapers(action) {
         if (Wallpapers.useGlint)
             return;
-        Quickshell.execDetached(["sh", "-c", 'w="$HOME/.local/bin/frame-wallpaper"; [ -x "$w" ] && "$w" "$1"', "frame-game", action]);
+        Quickshell.execDetached(["sh", "-c", 'w="$HOME/.local/bin/facet-wallpaper"; [ -x "$w" ] && "$w" "$1"', "facet-game", action]);
     }
 
     // ── Toggles ──────────────────────────────────────────────

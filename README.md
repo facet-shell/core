@@ -43,7 +43,7 @@ a mute each in the control center, a track each in a recording) come from one of
 
 The virtual channels are optional and only exist once `facet audio channels on` made them:
 `~/.config/pipewire/pipewire.conf.d/facet-channels.conf` (one loopback per channel, sinks
-`facet-<name>`, System becomes the default output) and `~/.local/state/frameshell/audio-channels.json`
+`facet-<name>`, System becomes the default output) and `~/.local/state/facet/audio-channels.json`
 for the shell. Sinks of the same name you already have are taken over instead of doubled, and
 an EasyEffects sink works as the output they play into. `facet audio channels output <sink>`
 moves them to another device, `facet audio channels off` removes all of it and puts every app
@@ -54,8 +54,8 @@ never writes PipeWire config itself (`services/Audio.qml`, `services/Channels.qm
 
 Install the wallpaper, Quickshell and Hyprland packages together with
 `facet install quickshell hypr wallpaper`. The installer selects Glint with
-`~/.local/state/frameshell/wallpaper-backend`; legacy configurations keep their
-existing backend until installation succeeds. `frame-glint-start` reuses a running
+`~/.local/state/facet/wallpaper-backend`; legacy configurations keep their
+existing backend until installation succeeds. `facet-glint-start` reuses a running
 daemon and migrates legacy assignments only when Glint has no saved state.
 
 The shared Quickshell service talks to Glint over its JSON socket, combines its

@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Io
 
 // Personal settings. The values here are the defaults; the settings app (settings/, Super+,
-// or "settings" in the control center) keeps your changes in ~/.config/frameshell/shell.json,
+// or "settings" in the control center) keeps your changes in ~/.config/facet/shell.json,
 // which wins over them and survives updates. Editing that file by hand works too, the shell
 // picks it up right away.
 Singleton {
@@ -13,7 +13,7 @@ Singleton {
 
     // ── Your changes ─────────────────────────────────────────
 
-    readonly property string file: `${Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config"}/frameshell/shell.json`
+    readonly property string file: `${Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config"}/facet/shell.json`
     // key → value, only what differs from the defaults below
     property var user: ({})
 
@@ -90,7 +90,7 @@ Singleton {
     // false) counts as off too.
     readonly property string animations: user.animations ?? "full"
     // Colors: "theme" (the one from facet theme) or "dynamic" (taken from the wallpaper,
-    // written to ~/.local/state/frameshell/bloom-dynamic.json; until something writes it the
+    // written to ~/.local/state/facet/bloom-dynamic.json; until something writes it the
     // theme's colors stay)
     readonly property string colorMode: user.colorMode ?? "theme"
     // While game mode is on the frame and the bar step away and the windows get the whole
@@ -203,7 +203,7 @@ Singleton {
         return !position.startsWith("bottom");
     }
 
-    // The bar's update count also covers frameshell (the CLI and the modules, compared with
+    // The bar's update count also covers facet (the CLI and the modules, compared with
     // their GitHub repos). false: neither checked nor shown; packages still are.
     readonly property bool frameUpdates: user.frameUpdates ?? true
 
@@ -255,7 +255,7 @@ Singleton {
     // ── Launcher ─────────────────────────────────────────────
 
     // Port the Spicetify extension connects to (s mode). Change it here and as PORT in
-    // spicetify/.config/spicetify/Extensions/frameshell.js, then run `facet update spicetify`.
+    // spicetify/.config/spicetify/Extensions/facet.js, then run `facet update spicetify`.
     readonly property int spotifyPort: user.spotifyPort ?? 48931
 
     // Web search (?): engine without a shortcut, and the shortcuts. %s is the search text.
@@ -308,8 +308,8 @@ Singleton {
 
     // ── Keyboard (AULA F75, Super+K) ─────────────────────────
 
-    // false: the keyboard app only shows what it would send (frame-keyboard dry run).
-    // Set it to true once frame-keyboard works on your board (docs/keyboard.md); the switch
+    // false: the keyboard app only shows what it would send (facet-keyboard dry run).
+    // Set it to true once facet-keyboard works on your board (docs/keyboard.md); the switch
     // in the app changes it until the shell restarts. true also lights the Super keys while
     // the hotkey overlay is open, and `facet theme set` puts the theme colors on the keys.
     readonly property bool keyboardLive: user.keyboardLive ?? true

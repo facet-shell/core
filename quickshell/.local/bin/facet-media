@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# frame-media – the files behind the media app (media/MediaApp.qml, Super+G).
+# facet-media – the files behind the media app (media/MediaApp.qml, Super+G).
 #
-#   frame-media list <dir> ...       every picture and video in these folders, newest first, one
+#   facet-media list <dir> ...       every picture and video in these folders, newest first, one
 #                                    line each: <mtime>\t<bytes>\t<image|video>\t<path>\t<edited 0|1>\t<tracks 0|1>
 #                                    (edited: <name>.edit.json is there, tracks: <name>.tracks/)
-#   frame-media thumb <video> <jpg>  a frame from one second in as a 400 px wide JPEG, made once;
+#   facet-media thumb <video> <jpg>  a frame from one second in as a 400 px wide JPEG, made once;
 #                                    prints the video's length in seconds
-#   frame-media trash <file> ...     into the trash, with what belongs to it (<name>.tracks/,
+#   facet-media trash <file> ...     into the trash, with what belongs to it (<name>.tracks/,
 #                                    <name>.edit.json); gio comes with glib2
-#   frame-media leftovers <dir> ...  .edit.json files and .tracks folders whose picture or video
+#   facet-media leftovers <dir> ...  .edit.json files and .tracks folders whose picture or video
 #                                    is gone (deleted in Dolphin, say), one path per line
 set -euo pipefail
 
 MEDIA_EXT=(png jpg jpeg webp gif bmp mp4 mkv webm mov)
 
 die() {
-    echo "frame-media: $*" >&2
+    echo "facet-media: $*" >&2
     exit 1
 }
 
@@ -95,5 +95,5 @@ case ${1:-} in
     thumb) shift; cmd_thumb "$@" ;;
     trash) shift; cmd_trash "$@" ;;
     leftovers) shift; cmd_leftovers "$@" ;;
-    *) die "usage: frame-media list <dir> ... | thumb <video> <jpg> | trash <file> ... | leftovers <dir> ..." ;;
+    *) die "usage: facet-media list <dir> ... | thumb <video> <jpg> | trash <file> ... | leftovers <dir> ..." ;;
 esac

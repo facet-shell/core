@@ -14,7 +14,7 @@ import qs.config
 //   goxlr    goxlr-utility's PipeWire outputs per channel (system, game, chat, music) and
 //            inputs for the mics; moving a stream there routes the app
 //   virtual  the virtual sinks `facet audio channels on` set up (PipeWire loopbacks into the
-//            real output, listed in ~/.local/state/frameshell/audio-channels.json); the shell
+//            real output, listed in ~/.local/state/facet/audio-channels.json); the shell
 //            never makes them itself
 // Without either, streams are moved between the machine's own sinks and sources the same way.
 // WirePlumber remembers the target per app, so routing survives restarts.
@@ -36,7 +36,7 @@ Singleton {
 
     // ── Virtual channels (facet audio channels) ──────────────
 
-    readonly property string channelsFile: `${Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state"}/frameshell/audio-channels.json`
+    readonly property string channelsFile: `${Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state"}/facet/audio-channels.json`
     // { output, channels: [{ key, label, sink }] } as the facet command wrote it; null while
     // they are not set up
     property var virtualSetup: null
@@ -97,7 +97,7 @@ Singleton {
     }
     // Real outputs a channel loopback can play into (not the channels themselves, not the
     // recorder's mix sink)
-    readonly property var hardwareSinks: sinks.filter(n => !virtualNodes.includes(n) && n.name !== "frame-rec")
+    readonly property var hardwareSinks: sinks.filter(n => !virtualNodes.includes(n) && n.name !== "facet-rec")
 
     // ── GoXLR channels ───────────────────────────────────────
 

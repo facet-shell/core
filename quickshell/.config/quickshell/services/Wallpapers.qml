@@ -8,7 +8,7 @@ import "WallpaperState.js" as State
 Singleton {
     id: root
 
-    readonly property string tool: `${Quickshell.env("HOME")}/.local/bin/frame-wallpaper`
+    readonly property string tool: `${Quickshell.env("HOME")}/.local/bin/facet-wallpaper`
     property bool legacyAvailable: true
     property bool glintConfigured: false
     readonly property bool useGlint: glintConfigured || Quickshell.env("FACET_GLINT") === "1"
@@ -144,7 +144,7 @@ Singleton {
     }
     function startGlint() {
         glintError = "Starting glint…";
-        Quickshell.execDetached([`${Quickshell.env("HOME")}/.local/bin/frame-glint-start`]);
+        Quickshell.execDetached([`${Quickshell.env("HOME")}/.local/bin/facet-glint-start`]);
     }
 
     GlintClient {
@@ -213,7 +213,7 @@ Singleton {
     }
 
     FileView {
-        path: `${Quickshell.env("XDG_STATE_HOME") || `${Quickshell.env("HOME")}/.local/state`}/frameshell/wallpaper-backend`
+        path: `${Quickshell.env("XDG_STATE_HOME") || `${Quickshell.env("HOME")}/.local/state`}/facet/wallpaper-backend`
         printErrors: false
         watchChanges: true
         onFileChanged: reload()
@@ -255,7 +255,7 @@ Singleton {
         onLoaded: root.legacyAvailable = true
     }
     FileView {
-        path: `${Quickshell.env("XDG_STATE_HOME") || `${Quickshell.env("HOME")}/.local/state`}/frameshell/wallpaper.json`
+        path: `${Quickshell.env("XDG_STATE_HOME") || `${Quickshell.env("HOME")}/.local/state`}/facet/wallpaper.json`
         printErrors: false
         watchChanges: true
         onFileChanged: reload()

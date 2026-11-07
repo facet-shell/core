@@ -1,6 +1,6 @@
 -- Infinite canvas: instead of tiling into workspaces, every window floats on one endless
 -- plane per workspace and the screen is a camera you move over it. Loaded from
--- frame/shell.lua when ~/.local/state/frameshell/layout says "canvas"
+-- facet/shell.lua when ~/.local/state/facet/layout says "canvas"
 -- (`facet layout canvas`, or the question in `facet install`).
 --
 -- Hyprland has no camera, so moving the view moves every window of the workspace the
@@ -8,17 +8,17 @@
 -- canvas is its place in Hyprland's layout plus the camera of its workspace; with more
 -- than one monitor each one has its own canvas at the monitor's position, so a window
 -- can be dragged from one to the other in the overview. The camera of each workspace is
--- kept in ~/.local/state/frameshell/canvas, so a config reload does not lose your spot.
+-- kept in ~/.local/state/facet/canvas, so a config reload does not lose your spot.
 -- The bar draws a minimap and the overview (Super+wheel) its map from
--- $XDG_RUNTIME_DIR/frame-canvas.json, written here.
+-- $XDG_RUNTIME_DIR/facet-canvas.json, written here.
 --
 -- Floating windows may sit anywhere outside the screen (misc.float_force_onscreen = 0,
 -- the default). With several monitors, a window half off one screen shows on the
 -- neighbouring one.
 
 local HOME = os.getenv("HOME") or ""
-local STATE = (os.getenv("XDG_STATE_HOME") or (HOME .. "/.local/state")) .. "/frameshell/canvas"
-local SNAPSHOT = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/frame-canvas.json"
+local STATE = (os.getenv("XDG_STATE_HOME") or (HOME .. "/.local/state")) .. "/facet/canvas"
+local SNAPSHOT = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/facet-canvas.json"
 
 -- Super+Ctrl+arrows moves the view by this share of the screen
 local PAN_SHARE = 0.5
@@ -773,7 +773,7 @@ load_cams()
 
 -- Windows that would tile float instead, at a comfortable size
 hl.window_rule({
-    name = "frame-canvas",
+    name = "facet-canvas",
     match = { float = false },
     float = true,
     size = { "monitor_w*" .. NEW_W, "monitor_h*" .. NEW_H },
@@ -960,7 +960,7 @@ local function overview(open)
     end
 end
 
--- For the bar (minimap), the overview and frame: hyprctl eval 'frame_canvas.look_at(0, 0)'
+-- For the bar (minimap), the overview and facet: hyprctl eval 'frame_canvas.look_at(0, 0)'
 frame_canvas = {
     overview = overview,
     pan = pan,

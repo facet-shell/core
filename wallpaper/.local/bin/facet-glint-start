@@ -5,7 +5,7 @@ state_root=${XDG_STATE_HOME:-"$HOME/.local/state"}
 glint="$HOME/.local/bin/glint"
 [[ -x $glint ]] || { echo "glint is not installed: run facet install wallpaper" >&2; exit 1; }
 if "$glint" outputs --json >/dev/null 2>&1; then exit 0; fi
-legacy="$state_root/frameshell/wallpaper.json"
+legacy="$state_root/facet/wallpaper.json"
 display=${WAYLAND_DISPLAY:-wayland-0}
 display=${display##*/}
 display=${display:-wayland-0}

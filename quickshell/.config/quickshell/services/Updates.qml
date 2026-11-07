@@ -9,7 +9,7 @@ import qs.config
 // syncs into a temporary database, so nothing changes on the system) and AUR ones from
 // paru or yay. Checked a minute after start and then every 30 minutes; a click on the
 // number opens Ghostty with the update and `facet update`, and checks again when it closes.
-// frameshell itself (the CLI and the module clones) is checked on the same schedule,
+// facet itself (the CLI and the module clones) is checked on the same schedule,
 // unless Config.frameUpdates is off.
 //
 // list: [{ name, from, to, aur }]
@@ -24,7 +24,7 @@ Singleton {
     readonly property int frameCount: frameList.length
     readonly property bool checking: checker.running || frameChecker.running
     property bool updating: false
-    // Only frameshell is behind: the click skips the package manager (and its sudo)
+    // Only facet is behind: the click skips the package manager (and its sudo)
     property bool frameOnly: false
 
     function check() {
@@ -76,7 +76,7 @@ Singleton {
         // Like checkupdates, without pacman-contrib: a copy of the sync databases in /tmp
         // (memory, not disk), refreshed there, then compared with what is installed; the
         // system's own databases stay untouched. AUR lines get an "aur " prefix.
-        command: ["sh", "-c", 'db="${TMPDIR:-/tmp}/frame-updates-$(id -u)"; mkdir -p "$db"; ln -sfn /var/lib/pacman/local "$db/local"; '
+        command: ["sh", "-c", 'db="${TMPDIR:-/tmp}/facet-updates-$(id -u)"; mkdir -p "$db"; ln -sfn /var/lib/pacman/local "$db/local"; '
             + 'if command -v fakeroot >/dev/null && fakeroot -- pacman -Sy --dbpath "$db" --logfile /dev/null >/dev/null 2>&1; then '
             + 'pacman -Qu --dbpath "$db" 2>/dev/null; fi; '
             + 'if command -v paru >/dev/null; then paru -Qua 2>/dev/null; elif command -v yay >/dev/null; then yay -Qua 2>/dev/null; fi | sed "s/^/aur /"; true']
@@ -92,7 +92,7 @@ Singleton {
         // is fetched or changed. All repos at once, each with a timeout and no credential
         // prompt, so a slow or missing network cannot hold the check up. A remote tip that
         // HEAD already contains is not an update (local commits on top of it).
-        command: ["sh", "-c", 'd="${XDG_DATA_HOME:-$HOME/.local/share}/frameshell"; '
+        command: ["sh", "-c", 'd="${XDG_DATA_HOME:-$HOME/.local/share}/facet"; '
             + 'f=$(readlink -f "$HOME/.local/bin/frame" 2>/dev/null) && cli=${f%/*}; [ -d "$cli/.git" ] || cli="$d/cli"; '
             + 'behind() { b=$(git -C "$2" symbolic-ref -q --short HEAD) || b=main; '
             + 'l=$(git -C "$2" rev-parse -q --verify HEAD) || return; '
@@ -112,7 +112,7 @@ Singleton {
     // Its own Ghostty process (not the single-instance one), so closing the window ends it
     Process {
         id: updater
-        command: ["ghostty", "--gtk-single-instance=false", "--title=frameshell update", "-e", "sh", "-c",
+        command: ["ghostty", "--gtk-single-instance=false", "--title=facet update", "-e", "sh", "-c",
             (root.frameOnly ? '' : 'if command -v paru >/dev/null; then paru -Syu; elif command -v yay >/dev/null; then yay -Syu; else sudo pacman -Syu; fi; ')
             + '[ -x "$HOME/.local/bin/frame" ] && "$HOME/.local/bin/frame" update; '
             + 'printf "\\nDone. Enter closes this window."; read _']

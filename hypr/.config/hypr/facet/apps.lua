@@ -1,4 +1,4 @@
--- Apps outside Quickshell: Dolphin, Zed, Zen. Loaded from frame/shell.lua.
+-- Apps outside Quickshell: Dolphin, Zed, Zen. Loaded from facet/shell.lua.
 
 -- Qt apps (Dolphin) take style, fonts and the theme palette from qt6ct
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# frame-start-locked – locks the session at Hyprland's start after `facet login auto`.
+# facet-start-locked – locks the session at Hyprland's start after `facet login auto`.
 #
 # With [initial_session] greetd logs in at boot without asking for a password, so the shell's
 # lockscreen has to be up before anyone can use the desktop. It fails closed: when the lock is
@@ -18,7 +18,7 @@ grep -qs '^\[initial_session\]' "${conf:-/etc/greetd/config.toml}" || exit 0
 # The boot this already ran in, kept in your own state folder (not /tmp, where anyone could
 # put it there first)
 boot=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-state="${XDG_STATE_HOME:-$HOME/.local/state}/frameshell/start-locked"
+state="${XDG_STATE_HOME:-$HOME/.local/state}/facet/start-locked"
 if [[ -n $boot ]]; then
     [[ -r $state && $(<"$state") == "$boot" ]] && exit 0
     mkdir -p "${state%/*}"
@@ -32,5 +32,5 @@ for _ in $(seq 1 80); do
     sleep 0.25
 done
 
-logger -t frame-start-locked "the shell did not lock within 20 s; ending the session so greetd asks for the password"
+logger -t facet-start-locked "the shell did not lock within 20 s; ending the session so greetd asks for the password"
 loginctl terminate-session "${XDG_SESSION_ID:-self}"

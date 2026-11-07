@@ -14,9 +14,9 @@ import qs.config
 //
 // Sound: the picker's audio panel picks the channels (the GoXLR's System, Game, Chat, Music,
 // the mic …, else the default output and input) and a level for each. More than nothing
-// chosen, frame-record-mix loops them into one sink that wf-recorder records
-// (quickshell/.local/bin/frame-record-mix). The choice is kept in
-// ~/.local/state/frameshell/record-audio.json.
+// chosen, facet-record-mix loops them into one sink that wf-recorder records
+// (quickshell/.local/bin/facet-record-mix). The choice is kept in
+// ~/.local/state/facet/record-audio.json.
 //
 // Next to the mixed sound every chosen channel is also recorded on its own, into
 // <recording>.tracks/ (one FLAC per channel, tracks.json, video-started), so the recording
@@ -40,7 +40,7 @@ Singleton {
     readonly property string folder: `${videosDir}/recordings`
     property string file: ""
 
-    readonly property string mixTool: `${Quickshell.env("HOME")}/.local/bin/frame-record-mix`
+    readonly property string mixTool: `${Quickshell.env("HOME")}/.local/bin/facet-record-mix`
     property bool mixing: false
 
     // ── Audio channels ───────────────────────────────────────
@@ -99,7 +99,7 @@ Singleton {
 
     FileView {
         id: state
-        path: `${Quickshell.env("XDG_STATE_HOME") || `${Quickshell.env("HOME")}/.local/state`}/frameshell/record-audio.json`
+        path: `${Quickshell.env("XDG_STATE_HOME") || `${Quickshell.env("HOME")}/.local/state`}/facet/record-audio.json`
         printErrors: false
         JsonAdapter {
             id: saved
@@ -124,10 +124,10 @@ Singleton {
             // monitor. The mix sources come before the first "--", the tracks before the
             // second, the area after it (bash, for the arrays). video-started is the moment
             // the picture starts, for lining the tracks up.
-            proc.command = ["bash", "-c", 'mkdir -p "$(dirname "$1")" && f=$1 && m=$2 && d=$3 && shift 3 && srcs=() && trk=() && while [ "$1" != "--" ]; do srcs+=("$1"); shift; done && shift && while [ "$1" != "--" ]; do trk+=("$1"); shift; done && shift && "$m" start "${srcs[@]}" >/dev/null && { "$m" tracks "$d" "${trk[@]}" || echo "frame-record: the separate tracks did not start" >&2; } && { date +%s%3N >"$d/video-started" 2>/dev/null || true; } && exec wf-recorder -f "$f" --audio=frame-rec.monitor "$@"',
-                "frame-record", file, mixTool, tracksDir(file)].concat(mix).concat(["--"]).concat(tracks).concat(["--"]).concat(args);
+            proc.command = ["bash", "-c", 'mkdir -p "$(dirname "$1")" && f=$1 && m=$2 && d=$3 && shift 3 && srcs=() && trk=() && while [ "$1" != "--" ]; do srcs+=("$1"); shift; done && shift && while [ "$1" != "--" ]; do trk+=("$1"); shift; done && shift && "$m" start "${srcs[@]}" >/dev/null && { "$m" tracks "$d" "${trk[@]}" || echo "facet-record: the separate tracks did not start" >&2; } && { date +%s%3N >"$d/video-started" 2>/dev/null || true; } && exec wf-recorder -f "$f" --audio=facet-rec.monitor "$@"',
+                "facet-record", file, mixTool, tracksDir(file)].concat(mix).concat(["--"]).concat(tracks).concat(["--"]).concat(args);
         } else {
-            proc.command = ["sh", "-c", 'mkdir -p "$(dirname "$1")" && f=$1 && shift && exec wf-recorder -f "$f" "$@"', "frame-record", file].concat(args);
+            proc.command = ["sh", "-c", 'mkdir -p "$(dirname "$1")" && f=$1 && shift && exec wf-recorder -f "$f" "$@"', "facet-record", file].concat(args);
         }
         proc.running = true;
         startedAt = Date.now();
@@ -189,7 +189,7 @@ Singleton {
                         Quickshell.execDetached(["xdg-open", root.folder]);
                     else if (id === "copy")
                         // As a file, so chat apps and file managers take the video itself
-                        Quickshell.execDetached(["sh", "-c", 'printf "file://%s\\n" "$1" | wl-copy --type text/uri-list', "frame-record", file]);
+                        Quickshell.execDetached(["sh", "-c", 'printf "file://%s\\n" "$1" | wl-copy --type text/uri-list', "facet-record", file]);
                     else if (id === "delete")
                         // With its separate tracks and the editor's project
                         Quickshell.execDetached(["rm", "-rf", "--", file, root.tracksDir(file), file.replace(/\.[^./]+$/, "") + ".edit.json"]);

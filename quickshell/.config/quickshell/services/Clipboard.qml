@@ -4,9 +4,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Clipboard history for the launcher (;, Super+V), from frame-clip (quickshell/.local/bin):
-// Hyprland starts `wl-paste --watch frame-clip store` (hypr/frame/shell.lua), which keeps
-// every copy as a file in ~/.cache/frameshell/clipboard. Pictures are files already, so the
+// Clipboard history for the launcher (;, Super+V), from facet-clip (quickshell/.local/bin):
+// Hyprland starts `wl-paste --watch facet-clip store` (hypr/facet/shell.lua), which keeps
+// every copy as a file in ~/.cache/facet/clipboard. Pictures are files already, so the
 // launcher shows them as they are.
 //
 // entries: [{ id, kind (txt, png, jpg, webp, gif), text (a text's first 700 characters, or a
@@ -16,8 +16,8 @@ Singleton {
 
     property var entries: []
     property bool loaded: false
-    readonly property string tool: `${Quickshell.env("HOME")}/.local/bin/frame-clip`
-    readonly property string dir: `${Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache"}/frameshell/clipboard`
+    readonly property string tool: `${Quickshell.env("HOME")}/.local/bin/facet-clip`
+    readonly property string dir: `${Quickshell.env("XDG_CACHE_HOME") || Quickshell.env("HOME") + "/.cache"}/facet/clipboard`
 
     function refresh() {
         list.running = true;
@@ -33,7 +33,7 @@ Singleton {
             const image = kind !== "txt";
             out.push({
                 id, kind, image,
-                // frame-clip writes a text's line breaks as \x1f, so one entry stays one line
+                // facet-clip writes a text's line breaks as \x1f, so one entry stays one line
                 text: image ? `${kind} · ${parts[2]}` : parts.slice(2).join("\t").replace(/\x1f/g, "\n"),
                 preview: image ? `${dir}/${id}.${kind}` : ""
             });

@@ -5,24 +5,24 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 
-// Front end for ~/.local/bin/frame-keyboard (keyboard package): lighting, Fn keys and
+// Front end for ~/.local/bin/facet-keyboard (keyboard package): lighting, Fn keys and
 // per-key colors of the board picked with `facet keyboard set` (or the one plugged in).
 // Key ids are physical keys named like a US board ("y" is the key labelled Z on QWERTZ);
 // actions typed by hand are read as QWERTZ.
 //
-// Nothing reaches the keyboard while `live` is false: frame-keyboard then only prints the
+// Nothing reaches the keyboard while `live` is false: facet-keyboard then only prints the
 // packets it would send (shown in `log`) and answers reads with placeholder data.
 Singleton {
     id: root
 
     // Hyprland's environment usually has no ~/.local/bin in PATH
-    readonly property string tool: `${Quickshell.env("HOME")}/.local/bin/frame-keyboard`
+    readonly property string tool: `${Quickshell.env("HOME")}/.local/bin/facet-keyboard`
     property bool available: true
     // Starts from Config.keyboardLive; the switch in the app changes it until the next restart
     property bool live: Config.keyboardLive
     readonly property bool busy: queue.length > 0 || proc.job !== null
 
-    // frame-keyboard board --json --layout de: { id, name, vendor, family, tested, can: {
+    // facet-keyboard board --json --layout de: { id, name, vendor, family, tested, can: {
     //   effects, brightness, speed, perkey, live, fn, layers }, rows: [[{ id, label, w }]], keys }
     property var board: null
     readonly property string boardName: board?.name ?? "keyboard"
@@ -34,7 +34,7 @@ Singleton {
     property var devices: []
     property var effects: []
     property var actions: ({ media: [], lighting: [], mods: [], keys: [], defaults: {} })
-    // frame-keyboard info --json: { dry, model, id, node, effect, effects: { name: { brightness,
+    // facet-keyboard info --json: { dry, model, id, node, effect, effects: { name: { brightness,
     //   speed, slot } }, layer, keys: { id: { bytes, text } }, colors: { id: "#rrggbb" } }
     property var info: null
     property string layer: "fn1"
@@ -42,14 +42,14 @@ Singleton {
     property string log: ""
     property string error: ""
 
-    // The picked board's configuration interface is there (frame-keyboard list --json)
+    // The picked board's configuration interface is there (facet-keyboard list --json)
     readonly property bool connected: devices.some(d => d.config && (!board || (d.boards ?? []).includes(board.id)))
     readonly property bool dongleOnly: !connected && devices.some(d => d.kind === "dongle")
 
     property var queue: []
 
     // ── Hotkey hints on the keys ─────────────────────────────
-    // What is held right now, from Hyprland (hypr/frame/hotkeys.lua): "super", "super+shift",
+    // What is held right now, from Hyprland (hypr/facet/hotkeys.lua): "super", "super+shift",
     // "ctrl+alt", … and "" on release. While the hotkey overlay is open by hand, Super counts.
     property string heldMods: ""
     property bool overlayOpen: false
@@ -63,7 +63,7 @@ Singleton {
         heldMods = next;
     }
 
-    // One word per key for `frame-keyboard highlight`: keys bound with exactly what is held
+    // One word per key for `facet-keyboard highlight`: keys bound with exactly what is held
     // in the text color, keys that need one modifier more dimmed, the held modifiers in primary
     readonly property var hintKeys: {
         if (hintMods === "")
@@ -103,7 +103,7 @@ Singleton {
             hint.write(hintKeys.join(" ") + "\n");
     }
 
-    // One frame-keyboard for the whole time something is held: new key lists go in over
+    // One facet-keyboard for the whole time something is held: new key lists go in over
     // stdin, so the frame changes without the board falling back to its effect in between.
     // Nothing is saved on the board; ending the process sends the stop packet.
     Process {
@@ -122,7 +122,7 @@ Singleton {
 
     // Effects and Fn actions of the board, once per board
     function loadTables() {
-        // An older frame-keyboard knows no boards: one set of tables, as before
+        // An older facet-keyboard knows no boards: one set of tables, as before
         const id = board?.id ?? "-";
         if (tablesFor === id)
             return;
@@ -217,7 +217,7 @@ Singleton {
                 const job = proc.job;
                 const text = this.text;
                 if (job.kind === "write") {
-                    root.log = `$ frame-keyboard ${job.args.join(" ")}\n${text}`;
+                    root.log = `$ facet-keyboard ${job.args.join(" ")}\n${text}`;
                 } else if (job.kind === "board" && text.trim() === "") {
                     root.loadTables();
                 } else if (text.trim() !== "") {
@@ -243,12 +243,12 @@ Singleton {
             }
         }
 
-        // frame-keyboard ends a failed command with "frame-keyboard: <reason>"
+        // facet-keyboard ends a failed command with "facet-keyboard: <reason>"
         stderr: StdioCollector {
             onStreamFinished: {
-                const failure = this.text.trim().split("\n").filter(l => l.startsWith("frame-keyboard: ")).pop() ?? "";
+                const failure = this.text.trim().split("\n").filter(l => l.startsWith("facet-keyboard: ")).pop() ?? "";
                 if (failure !== "")
-                    root.error = failure.slice("frame-keyboard: ".length);
+                    root.error = failure.slice("facet-keyboard: ".length);
             }
         }
     }

@@ -14,12 +14,12 @@ Scope {
             // The app rules for the virtual channels (does nothing without them)
             Channels.start();
             // A shell that died while the screen was locked left the wallpaper frozen
-            // (frame-wallpaper pause); this one lets it run again
-            Quickshell.execDetached(["sh", "-c", 'state="${XDG_STATE_HOME:-$HOME/.local/state}/frameshell/wallpaper-backend"; [ "$(cat "$state" 2>/dev/null)" = glint ] && exit 0; w="$HOME/.local/bin/frame-wallpaper"; [ -x "$w" ] && "$w" resume-if-paused']);
+            // (facet-wallpaper pause); this one lets it run again
+            Quickshell.execDetached(["sh", "-c", 'state="${XDG_STATE_HOME:-$HOME/.local/state}/facet/wallpaper-backend"; [ "$(cat "$state" 2>/dev/null)" = glint ] && exit 0; w="$HOME/.local/bin/facet-wallpaper"; [ -x "$w" ] && "$w" resume-if-paused']);
         }
     }
 
-    // The media keys (frame/shell.lua): qs ipc call player toggle|next|prev, no playerctl
+    // The media keys (facet/shell.lua): qs ipc call player toggle|next|prev, no playerctl
     // needed. They act on the player that started playing last, so a second press plays the
     // one the first paused (with Spotify and a video both playing, it went to the other one);
     // without one: Spotify if it plays, else whatever plays, then Spotify, then any player

@@ -25,7 +25,7 @@ Singleton {
     property real askedAt: 0
     property real took: 0
 
-    readonly property string workDir: `${Quickshell.env("HOME")}/.local/state/frameshell/claude`
+    readonly property string workDir: `${Quickshell.env("HOME")}/.local/state/facet/claude`
     readonly property string withPath: 'export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$HOME/.local/share/npm/bin:$PATH"; '
 
     // The launcher shows Markdown (paragraphs, lists, code blocks), so a command can come as one

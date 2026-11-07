@@ -11,27 +11,27 @@ import qs.config
 // Spotify for the launcher (s mode): search, play, queue and the player controls.
 //
 // Three ways to reach Spotify, tried in this order:
-//   1. the Spicetify extension (spicetify/.config/spicetify/Extensions/frameshell.js),
+//   1. the Spicetify extension (spicetify/.config/spicetify/Extensions/facet.js),
 //      which connects to the WebSocket below; search and play happen inside the client
-//   2. frame-spotify, the Web API helper with your own developer app (docs/spotify.md)
+//   2. facet-spotify, the Web API helper with your own developer app (docs/spotify.md)
 //   3. MPRIS: controls and playing a spotify: link work without either of the above
 // Non-Spotify players (browser, mpv) are controlled over MPRIS when Spotify is not running.
 //
 // The extension proves itself with the token `facet install spicetify` writes to
-// ~/.local/state/frameshell/spotify-bridge.token, so a web page that connects to the
+// ~/.local/state/facet/spotify-bridge.token, so a web page that connects to the
 // port cannot pose as Spotify and read what you search.
 //
 // results: [{ kind: "track" | "artist" | "album" | "playlist", uri, title, subtitle, image, length }]
 Singleton {
     id: root
 
-    readonly property string stateDir: `${Quickshell.env("HOME")}/.local/state/frameshell`
-    readonly property string helper: `${Quickshell.env("HOME")}/.local/bin/frame-spotify`
+    readonly property string stateDir: `${Quickshell.env("HOME")}/.local/state/facet`
+    readonly property string helper: `${Quickshell.env("HOME")}/.local/bin/facet-spotify`
 
     // The extension's socket after a valid hello, otherwise null
     property var socket: null
     readonly property bool bridged: socket !== null
-    // frame-spotify is logged in
+    // facet-spotify is logged in
     property bool apiReady: false
     property string token: ""
 
@@ -98,7 +98,7 @@ Singleton {
             try {
                 done(true, JSON.parse(out), "web api");
             } catch (e) {
-                done(false, "frame-spotify sent something odd");
+                done(false, "facet-spotify sent something odd");
             }
         });
         if (bridged)
@@ -199,7 +199,7 @@ Singleton {
         return false;
     }
 
-    // Whether frame-spotify is logged in; checked again whenever the launcher asks
+    // Whether facet-spotify is logged in; checked again whenever the launcher asks
     function refresh() {
         statusCheck.running = true;
     }
@@ -219,7 +219,7 @@ Singleton {
         } catch (e) {
             return;
         }
-        if (msg.hello === "frameshell") {
+        if (msg.hello === "facet" || msg.hello === "frameshell") {
             if (token === "" || msg.token !== token) {
                 console.warn("spotify: extension sent a wrong token, run `facet install spicetify` again");
                 ws.active = false;
@@ -285,7 +285,7 @@ Singleton {
         onTriggered: root.runSearch(root.query)
     }
 
-    // ── frame-spotify ────────────────────────────────────────
+    // ── facet-spotify ────────────────────────────────────────
 
     // callback(ok, output): stdout on success, the error message otherwise
     function helperCall(args, callback) {
@@ -309,7 +309,7 @@ Singleton {
                     const code = newline < 0 ? text : text.slice(0, newline);
                     const out = newline < 0 ? "" : text.slice(newline + 1).trim();
                     if (proc.callback)
-                        proc.callback(code === "0", code === "0" ? out : out.replace(/^frame-spotify: /, ""));
+                        proc.callback(code === "0", code === "0" ? out : out.replace(/^facet-spotify: /, ""));
                     proc.destroy();
                 }
             }

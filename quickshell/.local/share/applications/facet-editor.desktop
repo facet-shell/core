@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=frameshell editor
+Name=facet editor
 Comment=Blur, crop and cut screenshots and recordings
 Exec=qs ipc call editor open %f
 Icon=applications-graphics

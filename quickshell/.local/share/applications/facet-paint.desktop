@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=frameshell paint
+Name=facet paint
 Comment=An empty page in the picture editor: pen, shapes, text, ruler
 Exec=qs ipc call editor paint
 Icon=applications-graphics

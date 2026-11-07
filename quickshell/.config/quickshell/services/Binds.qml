@@ -7,7 +7,7 @@ import Quickshell.Io
 // Keybinds as Hyprland reports them (`hyprctl binds -j`), turned into rows for the hotkey overlay.
 //
 // rows: [{ mods: ["super", "shift"], key: "space", label, group, source ("frame" | "hyprland") }]
-// Descriptions like "frame shell · launcher" (see hypr/frame/*.lua) give group and label;
+// Descriptions like "facet shell · launcher" (see hypr/facet/*.lua) give group and label;
 // your own binds can use "group · text". Without a description the row is built from
 // dispatcher and argument. Expected JSON per bind: modmask (Super 64, Shift 1, Ctrl 4,
 // Alt 8), key, mouse, description, dispatcher, arg, submap. Not checked against the Lua

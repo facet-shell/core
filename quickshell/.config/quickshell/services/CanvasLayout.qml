@@ -5,9 +5,9 @@ import Quickshell
 import Quickshell.Io
 
 // CanvasLayout (not "Canvas": that name is QtQuick.Canvas). The infinite-canvas layout
-// (hypr/frame/canvas.lua) as the bar and the overview see it.
-// enabled: ~/.local/state/frameshell/layout says "canvas" (`facet layout canvas`).
-// The rest comes from $XDG_RUNTIME_DIR/frame-canvas.json, which canvas.lua rewrites on
+// (hypr/facet/canvas.lua) as the bar and the overview see it.
+// enabled: ~/.local/state/facet/layout says "canvas" (`facet layout canvas`).
+// The rest comes from $XDG_RUNTIME_DIR/facet-canvas.json, which canvas.lua rewrites on
 // every change: { monitors: [{ name, focused, workspace, x, y, w, h, camera: { x, y } }],
 //   windows: [{ address, monitor, x, y, w, h, active, class, title }] }
 // in global canvas coordinates: a monitor's view starts at its position plus its camera,
@@ -161,7 +161,7 @@ Singleton {
     }
 
     FileView {
-        path: `${Quickshell.env("HOME")}/.local/state/frameshell/layout`
+        path: `${Quickshell.env("HOME")}/.local/state/facet/layout`
         printErrors: false
         watchChanges: true
         onFileChanged: reload()
@@ -170,7 +170,7 @@ Singleton {
     }
 
     FileView {
-        path: `${Quickshell.env("XDG_RUNTIME_DIR")}/frame-canvas.json`
+        path: `${Quickshell.env("XDG_RUNTIME_DIR")}/facet-canvas.json`
         printErrors: false
         watchChanges: true
         onFileChanged: reload()

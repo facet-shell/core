@@ -1,24 +1,24 @@
--- frameshell for Hyprland (Lua config, Hyprland 0.55+): autostart, shell keybinds, idle.
--- Loaded from your own hyprland.lua with require("frame/shell"); `facet install hypr`
+-- facet for Hyprland (Lua config, Hyprland 0.55+): autostart, shell keybinds, idle.
+-- Loaded from your own hyprland.lua with require("facet/shell"); `facet install hypr`
 -- adds that line. Descriptions show up in the hotkey overlay (hold Super).
 
 -- Quickshell runs bar, launcher, lockscreen and the rest (also the idle lock and screen
 -- off, lockscreen/Lock.qml); glint starts the selected wallpaper;
--- frame-clip keeps what you copy for the launcher
+-- facet-clip keeps what you copy for the launcher
 hl.on("hyprland.start", function()
     hl.exec_cmd("qs")
     -- Restarts the shell when it hangs (a hung shell looks like a frozen PC) and keeps its log
-    hl.exec_cmd("~/.local/bin/frame-shell-watchdog")
-    hl.exec_cmd([[sh -c 'state="${XDG_STATE_HOME:-$HOME/.local/state}/frameshell/wallpaper-backend"; if [ -x "$HOME/.local/bin/glint" ] && [ "$(cat "$state" 2>/dev/null)" = glint ]; then exec "$HOME/.local/bin/frame-glint-start"; else exec "$HOME/.local/bin/frame-wallpaper" apply; fi']])
+    hl.exec_cmd("~/.local/bin/facet-shell-watchdog")
+    hl.exec_cmd([[sh -c 'state="${XDG_STATE_HOME:-$HOME/.local/state}/facet/wallpaper-backend"; if [ -x "$HOME/.local/bin/glint" ] && [ "$(cat "$state" 2>/dev/null)" = glint ]; then exec "$HOME/.local/bin/facet-glint-start"; else exec "$HOME/.local/bin/facet-wallpaper" apply; fi']])
     -- Clipboard history for the launcher (;)
-    hl.exec_cmd("wl-paste --watch ~/.local/bin/frame-clip store")
+    hl.exec_cmd("wl-paste --watch ~/.local/bin/facet-clip store")
     -- GoXLR faders and mutes for the shell; does nothing without GoXLR Utility
     hl.exec_cmd("command -v goxlr-daemon >/dev/null && goxlr-daemon")
     -- `facet login auto`: greetd logs in without a greeter, so the session starts locked and
     -- the shell's lockscreen asks for the password instead; without the lock the session
-    -- ends (quickshell/.local/bin/frame-start-locked). Only here, at Hyprland's start, never
+    -- ends (quickshell/.local/bin/facet-start-locked). Only here, at Hyprland's start, never
     -- when the shell alone restarts.
-    hl.exec_cmd("~/.local/bin/frame-start-locked")
+    hl.exec_cmd("~/.local/bin/facet-start-locked")
 end)
 
 -- A key bound twice runs both binds, and the distro config (CachyOS: config/binds.lua)
@@ -38,17 +38,17 @@ local function shell(target, action)
     return hl.dsp.exec_cmd("qs ipc call " .. target .. " " .. action)
 end
 
-take("SUPER + SPACE", shell("launcher", "toggle"), { description = "frame shell · launcher" })
-take("SUPER + C", shell("controlcenter", "toggle"), { description = "frame shell · control center" })
-take("SUPER + V", shell("launcher", "clipboard"), { description = "frame shell · clipboard history" })
-take("SUPER + W", shell("wallpapers", "toggle"), { description = "frame shell · wallpapers" })
-take("SUPER + K", shell("keyboard", "toggle"), { description = "frame shell · keyboard (AULA F75)" })
-take("SUPER + G", shell("media", "toggle"), { description = "frame shell · media: screenshots and recordings" })
-take("SUPER + comma", shell("settings", "toggle"), { description = "frame shell · settings" })
-take("SUPER + L", shell("lock", "lock"), { description = "frame shell · lock" })
+take("SUPER + SPACE", shell("launcher", "toggle"), { description = "facet shell · launcher" })
+take("SUPER + C", shell("controlcenter", "toggle"), { description = "facet shell · control center" })
+take("SUPER + V", shell("launcher", "clipboard"), { description = "facet shell · clipboard history" })
+take("SUPER + W", shell("wallpapers", "toggle"), { description = "facet shell · wallpapers" })
+take("SUPER + K", shell("keyboard", "toggle"), { description = "facet shell · keyboard (AULA F75)" })
+take("SUPER + G", shell("media", "toggle"), { description = "facet shell · media: screenshots and recordings" })
+take("SUPER + comma", shell("settings", "toggle"), { description = "facet shell · settings" })
+take("SUPER + L", shell("lock", "lock"), { description = "facet shell · lock" })
 -- Hyprland still takes keys when the shell hangs: this restarts it without waiting for the
--- watchdog (frame-shell-watchdog), the lock comes back if it was on
-take("SUPER + SHIFT + Escape", hl.dsp.exec_cmd("~/.local/bin/frame-shell-watchdog restart"), { description = "frame shell · restart the shell (when it hangs)" })
+-- watchdog (facet-shell-watchdog), the lock comes back if it was on
+take("SUPER + SHIFT + Escape", hl.dsp.exec_cmd("~/.local/bin/facet-shell-watchdog restart"), { description = "facet shell · restart the shell (when it hangs)" })
 -- Ctrl+Alt+Q types an @ and Ctrl+Alt+E a € (the Windows habit; for a keyboard without a
 -- working AltGr). Hyprland sends AltGr+key (MOD5) straight to the focused window, so the app
 -- sees the real key and no virtual keyboard shows up as a layout change. The launcher is a
@@ -67,35 +67,35 @@ for key, char in pairs({ q = "@", e = "€" }) do
         else
             hl.dispatch(hl.dsp.exec_raw("sendshortcut MOD5, " .. key .. ", activewindow"))
         end
-    end, { description = "frame shell · type " .. char })
+    end, { description = "facet shell · type " .. char })
 end
 
 -- Media keys (the keyboard's Fn+F7/F8/F9): the distro calls playerctl, which is not always
 -- installed; the shell drives the player over MPRIS itself. Locked: also on the lockscreen
-take("XF86AudioPlay", shell("player", "toggle"), { locked = true, description = "frame shell · media: play / pause" })
-take("XF86AudioPause", shell("player", "toggle"), { locked = true, description = "frame shell · media: play / pause" })
-take("XF86AudioNext", shell("player", "next"), { locked = true, description = "frame shell · media: next track" })
-take("XF86AudioPrev", shell("player", "prev"), { locked = true, description = "frame shell · media: previous track" })
+take("XF86AudioPlay", shell("player", "toggle"), { locked = true, description = "facet shell · media: play / pause" })
+take("XF86AudioPause", shell("player", "toggle"), { locked = true, description = "facet shell · media: play / pause" })
+take("XF86AudioNext", shell("player", "next"), { locked = true, description = "facet shell · media: next track" })
+take("XF86AudioPrev", shell("player", "prev"), { locked = true, description = "facet shell · media: previous track" })
 
 -- Screenshots (the distro binds Print to grim + slurp; the shell has its own picker)
-take("Print", shell("screenshot", "region"), { description = "frame shell · screenshot: region or window" })
-take("SHIFT + Print", shell("screenshot", "screen"), { description = "frame shell · screenshot: whole screen" })
-take("SUPER + Print", shell("screenshot", "screen"), { description = "frame shell · screenshot: whole screen" })
+take("Print", shell("screenshot", "region"), { description = "facet shell · screenshot: region or window" })
+take("SHIFT + Print", shell("screenshot", "screen"), { description = "facet shell · screenshot: whole screen" })
+take("SUPER + Print", shell("screenshot", "screen"), { description = "facet shell · screenshot: whole screen" })
 -- Keyboards without a Print key: the Windows shortcuts (Super+Shift+S was the distro's
 -- "move window to special workspace")
-take("SUPER + SHIFT + S", shell("screenshot", "region"), { description = "frame shell · screenshot: region or window" })
-take("SUPER + CTRL + S", shell("screenshot", "screen"), { description = "frame shell · screenshot: whole screen" })
+take("SUPER + SHIFT + S", shell("screenshot", "region"), { description = "facet shell · screenshot: region or window" })
+take("SUPER + CTRL + S", shell("screenshot", "screen"), { description = "facet shell · screenshot: whole screen" })
 -- Screen recording: the same picker; the same key (or the dot in the bar) stops it
-take("SUPER + SHIFT + R", shell("screenshot", "record"), { description = "frame shell · screen recording: start or stop" })
+take("SUPER + SHIFT + R", shell("screenshot", "record"), { description = "facet shell · screen recording: start or stop" })
 -- Drawing on the screen (quickshell/draw): Super+P again hides it and gives the screen back,
 -- the drawing stays for next time; take() drops the distro's own Super+P first
-take("SUPER + P", shell("draw", "toggle"), { description = "frame shell · draw on the screen (again: hide)" })
-take("SUPER + SHIFT + P", shell("draw", "clear"), { description = "frame shell · draw: clear the drawing" })
+take("SUPER + P", shell("draw", "toggle"), { description = "facet shell · draw on the screen (again: hide)" })
+take("SUPER + SHIFT + P", shell("draw", "clear"), { description = "facet shell · draw: clear the drawing" })
 -- Discord voice (quickshell/voice): move the overlay, mute and deafen from anywhere, a game
 -- included; Discord needs no keybind of its own for that
-take("SUPER + SHIFT + V", shell("voice", "move"), { description = "frame shell · voice overlay: move it (again or Esc: done)" })
-take("SUPER + SHIFT + M", shell("voice", "mute"), { description = "frame shell · Discord: mute or unmute" })
-take("SUPER + SHIFT + D", shell("voice", "deafen"), { description = "frame shell · Discord: deafen or undeafen" })
+take("SUPER + SHIFT + V", shell("voice", "move"), { description = "facet shell · voice overlay: move it (again or Esc: done)" })
+take("SUPER + SHIFT + M", shell("voice", "mute"), { description = "facet shell · Discord: mute or unmute" })
+take("SUPER + SHIFT + D", shell("voice", "deafen"), { description = "facet shell · Discord: deafen or undeafen" })
 
 -- Windows over each other (on the canvas nothing keeps them apart): Alt+Tab goes to the next
 -- window and brings it up, Super+Alt+B sends the active one to the back. Super+Alt+S puts the
@@ -201,14 +201,14 @@ hl.config({
 })
 
 -- Each require is its own scope in Hyprland, so an error in one file leaves the others working
-require("frame/apps")
-require("frame/hotkeys")
+require("facet/apps")
+require("facet/hotkeys")
 
 -- Layout picked in `facet install` or with `facet layout tiling|canvas`; the normal
--- tiling needs nothing, the infinite canvas lives in frame/canvas.lua
+-- tiling needs nothing, the infinite canvas lives in facet/canvas.lua
 local function layout()
     local home = os.getenv("XDG_STATE_HOME") or ((os.getenv("HOME") or "") .. "/.local/state")
-    local f = io.open(home .. "/frameshell/layout", "r")
+    local f = io.open(home .. "/facet/layout", "r")
     if not f then
         return "tiling"
     end
@@ -217,7 +217,7 @@ local function layout()
     return mode
 end
 if layout() == "canvas" then
-    require("frame/canvas")
+    require("facet/canvas")
 end
 -- Written by `facet theme`; missing until the first run, which must not stop the rest
-pcall(require, "frame/colors")
+pcall(require, "facet/colors")

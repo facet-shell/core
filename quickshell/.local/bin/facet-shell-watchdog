@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# frame-shell-watchdog – restarts Quickshell when it hangs.
+# facet-shell-watchdog – restarts Quickshell when it hangs.
 #
 # A hung shell looks like a frozen PC: bar, launcher and overlays stop answering, and an open
 # launcher keeps the keyboard. Every 5 seconds this asks the shell over IPC whether the session
 # is locked; IPC runs on the shell's main thread, so a hung shell never answers. After three
 # missed answers in a row (about 25 s) the hung instance is dumped and replaced:
-#   - its log goes to ~/.local/state/frameshell/hangs/<time>.log
+#   - its log goes to ~/.local/state/facet/hangs/<time>.log
 #   - SIGABRT leaves a core dump with the stack it hung in (`coredumpctl info qs`)
 #   - a new qs starts and, if the session was locked, takes the lock over at once; until then
 #     Hyprland keeps the screen locked, so a hang never opens the desktop
 # Only a running but silent shell counts: a crashed one or one restarted by hand is left alone.
 #
-# `frame-shell-watchdog restart` does the same at once (Super+Shift+Escape, frame/shell.lua).
+# `facet-shell-watchdog restart` does the same at once (Super+Shift+Escape, facet/shell.lua).
 set -u
 
-state="${XDG_STATE_HOME:-$HOME/.local/state}/frameshell"
+state="${XDG_STATE_HOME:-$HOME/.local/state}/facet"
 hangs="$state/hangs"
 lockfile="$state/shell-locked"
 
@@ -23,7 +23,7 @@ restart() {
     stamp=$(date +%F_%H-%M-%S)
     [[ -r $lockfile && $(<"$lockfile") == true ]] && locked=true
     mkdir -p "$hangs"
-    logger -t frame-shell-watchdog "qs (pid $pid) $reason; restarting it (locked: $locked, log: $hangs/$stamp.log)"
+    logger -t facet-shell-watchdog "qs (pid $pid) $reason; restarting it (locked: $locked, log: $hangs/$stamp.log)"
     {
         echo "# qs pid $pid, $reason, $(date)"
         grep -E '^(State|VmRSS|Threads):' "/proc/$pid/status" 2>/dev/null
@@ -57,7 +57,7 @@ if [[ ${1:-} == restart ]]; then
 fi
 
 # One watchdog per session
-exec 9>"${XDG_RUNTIME_DIR:-/tmp}/frame-shell-watchdog.lock"
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/facet-shell-watchdog.lock"
 flock -n 9 || exit 0
 
 mkdir -p "$state"

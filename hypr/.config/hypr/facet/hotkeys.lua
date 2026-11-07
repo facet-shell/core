@@ -1,5 +1,5 @@
 -- Hold Super for a second and a half: the hotkey overlay opens; letting go closes it.
--- Loaded from frame/shell.lua. Quickshell draws the overlay (qs ipc call hotkeys …).
+-- Loaded from facet/shell.lua. Quickshell draws the overlay (qs ipc call hotkeys …).
 --
 -- It stays closed when Super is used for something else in the meantime: another key
 -- (Super+Space, Super+1, …) or a window drag with Super and the mouse.
