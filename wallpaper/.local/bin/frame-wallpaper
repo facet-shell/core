@@ -131,10 +131,10 @@ thumbnail() {
 
 cmd_list() {
     local backend dir folder file kind preview name mature
-    backend="$(state | jq -r .backend)"
+    backend="${1:-$(state | jq -r .backend)}"
     mature="$(state | jq -r 'if .mature == false then false else true end')"
     {
-        if [[ $backend == both && -d $WORKSHOP ]]; then
+        if [[ $backend == both && ${2:-} != local && -d $WORKSHOP ]]; then
             for dir in "$WORKSHOP"/*/; do
                 dir="${dir%/}"
                 [[ -f $dir/project.json ]] || continue
@@ -620,6 +620,7 @@ cmd_backend() {
 
 case "${1:-}" in
     list) cmd_list ;;
+    list-local) cmd_list both local ;;
     state) state ;;
     set) shift; cmd_set "$@" ;;
     option) shift; cmd_option "$@" ;;

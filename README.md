@@ -49,3 +49,29 @@ an EasyEffects sink works as the output they play into. `facet audio channels ou
 moves them to another device, `facet audio channels off` removes all of it and puts every app
 back on the output. Without them and without a GoXLR nothing about channels shows; the shell
 never writes PipeWire config itself (`services/Audio.qml`, `services/Channels.qml`).
+
+## Glint wallpaper backend
+
+Install the wallpaper, Quickshell and Hyprland packages together with
+`facet install quickshell hypr wallpaper`. The installer selects Glint with
+`~/.local/state/frameshell/wallpaper-backend`; legacy configurations keep their
+existing backend until installation succeeds. `frame-glint-start` reuses a running
+daemon and migrates legacy assignments only when Glint has no saved state.
+
+The shared Quickshell service talks to Glint over its JSON socket, combines its
+installed Workshop library with local images and videos, and exposes per-display
+rendering and project settings. Changing a common option for all displays preserves
+each display's wallpaper and other options. A disconnected Glint backend reports
+an error instead of starting a legacy renderer.
+
+Controller and migration checks, without a GPU or running daemon:
+
+```sh
+python3 tests/glint/run-smoke.py
+python3 tests/glint/test-helper.py
+python3 tests/glint/run-smoke.py --bloom /path/to/style-bloom
+python3 tests/glint/run-smoke.py --tui /path/to/style-tui
+```
+
+These checks use an asynchronous fake transport; visual rendering and desktop
+compositor behavior still need a real-session check.

@@ -3,13 +3,13 @@
 -- adds that line. Descriptions show up in the hotkey overlay (hold Super).
 
 -- Quickshell runs bar, launcher, lockscreen and the rest (also the idle lock and screen
--- off, lockscreen/Lock.qml); frame-wallpaper starts the wallpaper picked in the app;
+-- off, lockscreen/Lock.qml); glint starts the selected wallpaper;
 -- frame-clip keeps what you copy for the launcher
 hl.on("hyprland.start", function()
     hl.exec_cmd("qs")
     -- Restarts the shell when it hangs (a hung shell looks like a frozen PC) and keeps its log
     hl.exec_cmd("~/.local/bin/frame-shell-watchdog")
-    hl.exec_cmd("~/.local/bin/frame-wallpaper apply")
+    hl.exec_cmd([[sh -c 'state="${XDG_STATE_HOME:-$HOME/.local/state}/frameshell/wallpaper-backend"; if [ -x "$HOME/.local/bin/glint" ] && [ "$(cat "$state" 2>/dev/null)" = glint ]; then exec "$HOME/.local/bin/frame-glint-start"; else exec "$HOME/.local/bin/frame-wallpaper" apply; fi']])
     -- Clipboard history for the launcher (;)
     hl.exec_cmd("wl-paste --watch ~/.local/bin/frame-clip store")
     -- GoXLR faders and mutes for the shell; does nothing without GoXLR Utility

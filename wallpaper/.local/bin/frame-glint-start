@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_root=${XDG_STATE_HOME:-"$HOME/.local/state"}
+glint="$HOME/.local/bin/glint"
+[[ -x $glint ]] || { echo "glint is not installed: run facet install wallpaper" >&2; exit 1; }
+if "$glint" outputs --json >/dev/null 2>&1; then exit 0; fi
+legacy="$state_root/frameshell/wallpaper.json"
+display=${WAYLAND_DISPLAY:-wayland-0}
+display=${display##*/}
+display=${display:-wayland-0}
+case "$display" in
+    wayland-0|wayland-1) state="$state_root/glint/state.json" ;;
+    *) state="$state_root/glint/state-$display.json" ;;
+esac
+
+if [[ ! -e $state && -r $legacy ]] && command -v jq >/dev/null; then
+    mkdir -p "${state%/*}"
+    tmp=$(mktemp "${state}.XXXXXX")
+    trap 'rm -f "$tmp"' EXIT
+    if jq -e '
+        if (.screens | type) != "object" then error("invalid screens") else . end |
+        {version: 1, outputs: {}, options: {
+            scaling: (if .scaling == "fit" then "fit" else "fill" end),
+            fps: (if (.fps | type) == "number" and .fps >= 0 and .fps <= 1000 then .fps else 30 end),
+            volume: (if (.volume | type) == "number" and .volume >= 0 and .volume <= 100 then .volume / 100 else 0 end)
+        }, screens: .screens} |
+        . as $root |
+        reduce ($root.screens | to_entries[]) as $entry
+            (.; if ($entry.value.path | type) != "string" or $entry.value.path == "" then .
+                elif $entry.key == "*" then .all = {path: $entry.value.path, options: $root.options}
+                else .outputs[$entry.key] = {path: $entry.value.path, options: $root.options} end) |
+        del(.options, .screens)
+    ' "$legacy" > "$tmp" && ln "$tmp" "$state" 2>/dev/null; then
+        :
+    fi
+    rm -f "$tmp"
+    trap - EXIT
+fi
+mkdir -p "$state_root/glint"
+exec "$glint" --daemon >>"$state_root/glint/daemon.log" 2>&1

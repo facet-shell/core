@@ -15,7 +15,7 @@ Scope {
             Channels.start();
             // A shell that died while the screen was locked left the wallpaper frozen
             // (frame-wallpaper pause); this one lets it run again
-            Quickshell.execDetached(["sh", "-c", 'w="$HOME/.local/bin/frame-wallpaper"; [ -x "$w" ] && "$w" resume-if-paused']);
+            Quickshell.execDetached(["sh", "-c", 'state="${XDG_STATE_HOME:-$HOME/.local/state}/frameshell/wallpaper-backend"; [ "$(cat "$state" 2>/dev/null)" = glint ] && exit 0; w="$HOME/.local/bin/frame-wallpaper"; [ -x "$w" ] && "$w" resume-if-paused']);
         }
     }
 
