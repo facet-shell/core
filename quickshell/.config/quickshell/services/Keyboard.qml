@@ -53,7 +53,7 @@ Singleton {
     // "ctrl+alt", … and "" on release. While the hotkey overlay is open by hand, Super counts.
     property string heldMods: ""
     property bool overlayOpen: false
-    readonly property string hintMods: heldMods !== "" ? heldMods : (overlayOpen ? "super" : "")
+    readonly property string hintMods: !Config.keyboardHotkeyHints ? "" : heldMods !== "" ? heldMods : (overlayOpen ? "super" : "")
 
     function setHeldMods(text) {
         const next = String(text ?? "").trim().toLowerCase();

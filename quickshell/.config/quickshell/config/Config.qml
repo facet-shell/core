@@ -178,7 +178,7 @@ Singleton {
     readonly property int spotifySeconds: user.spotifySeconds ?? 6
     // bloom: the music parts (the Spotify popup, the dashboard's media card, the lockscreen's
     // music) take their accent from the album cover instead of the theme
-    readonly property bool albumColors: user.albumColors ?? true
+    readonly property bool albumColors: user.albumColors ?? false
 
     // The Discord voice overlay while you are in a voice channel: when it shows ("always",
     // "hidden": Discord on no screen, "game": while game mode is on, "never"); list, compact
@@ -192,6 +192,8 @@ Singleton {
     readonly property string voiceOverlayFeed: user.voiceOverlayFeed ?? "overlay"
     readonly property real voiceOverlaySize: user.voiceOverlaySize ?? 1
     readonly property bool voiceOverlayDim: user.voiceOverlayDim ?? true
+    readonly property bool voiceOverlayInBar: user.voiceOverlayInBar ?? false
+    readonly property int voiceBarMaxUsers: Math.max(1, Math.min(12, user.voiceBarMaxUsers ?? 5))
     readonly property var voiceOverlayPos: user.voiceOverlayPos ?? ({})
 
     // "left", "right" or "center" of a position, and whether it is at the top
@@ -313,4 +315,6 @@ Singleton {
     // in the app changes it until the shell restarts. true also lights the Super keys while
     // the hotkey overlay is open, and `facet theme set` puts the theme colors on the keys.
     readonly property bool keyboardLive: user.keyboardLive ?? true
+    readonly property bool hotkeysOnHold: user.hotkeysOnHold ?? false
+    readonly property bool keyboardHotkeyHints: user.keyboardHotkeyHints ?? false
 }
