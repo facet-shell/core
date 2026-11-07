@@ -81,11 +81,16 @@ Singleton {
     }
 
     function setDisplaySetting(output, name, value) {
+        setDisplaySettings(output, { [name]: value });
+    }
+
+    function setDisplaySettings(output, changes) {
         if (!glintActive) { glintError = "Glint is not connected"; return; }
-        if (!["fps", "scaling", "volume", "mute", "transition", "duration", "color"].includes(name)) return;
+        const allowed = ["fps", "scaling", "volume", "mute", "transition", "duration", "color"];
+        if (!Object.keys(changes).length || Object.keys(changes).some(key => !allowed.includes(key))) return;
         glintError = "";
         const id = glint.send("status");
-        if (id >= 0) optionRequests[id] = { output: output || "*", changes: { [name]: value } };
+        if (id >= 0) optionRequests[id] = { output: output || "*", changes: changes };
     }
 
     function option(key, value) {

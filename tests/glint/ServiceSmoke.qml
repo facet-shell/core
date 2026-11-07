@@ -36,6 +36,10 @@ ShellRoot {
                 Wallpapers.resumeGlint("locked");
             } else if (test.phase === 5) {
                 test.check(Wallpapers.glintStatus["DP-2"].state === "running", "unlock resume failed");
+                Wallpapers.setDisplaySettings("DP-2", { volume: 0.7, mute: false });
+            } else if (test.phase === 6) {
+                test.check(Wallpapers.glintStatus["DP-2"].options.volume === 0.7 && Wallpapers.glintStatus["DP-2"].options.mute === false, "volume did not clear mute");
+                test.check(Wallpapers.glintStatus["HDMI-A-1"].options.volume === 0.2, "volume affected another output");
                 Wallpapers.glintReady = false;
                 Wallpapers.apply("/test/42", "*");
                 test.check(Wallpapers.glintError.includes("not connected"), "offline request fell back to old backend");
