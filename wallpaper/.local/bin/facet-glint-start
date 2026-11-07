@@ -60,7 +60,8 @@ fi
 if $silent && [[ -f $state ]]; then
     tmp=$(mktemp "${state}.XXXXXX")
     trap 'rm -f "$tmp"' EXIT
-    jq 'if (.all | type) == "object" then .all.options.volume = 0 | .all.options.mute = false else . end
+    jq 'if (.settings | type) == "object" then .settings.volume = 0 | .settings.mute = false else . end
+        | if (.all | type) == "object" then .all.options.volume = 0 | .all.options.mute = false else . end
         | if (.outputs | type) == "object" then .outputs |= with_entries(.value.options.volume = 0 | .value.options.mute = false) else . end' "$state" >"$tmp"
     chmod --reference="$state" "$tmp"
     mv "$tmp" "$state"

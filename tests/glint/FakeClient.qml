@@ -12,6 +12,8 @@ Scope {
         "HDMI-A-1": { path: "/other/video", kind: "video", state: "running", options: { fps: 30, volume: 0.2, scaling: "fill" } }
     })
     property bool clock: true
+    property var defaults: ({fps: 60, volume: 0.5, scaling: "fit", mute: false,
+        transition: "fade", duration: 300, color: "#000000"})
     signal response(int id, string operation, var result)
     signal requestFailed(int id, string operation, string message)
     signal eventReceived(string event, var data)
@@ -23,16 +25,24 @@ Scope {
         const request = Object.assign({}, fields || {}, { op: operation });
         console.log("FAKE_REQUEST", JSON.stringify(request));
         let result = {};
-        if (operation === "version") result = { operations: ["list", "set", "status", "props", "outputs"] };
+        if (operation === "version") result = { operations: ["list", "set", "status", "props", "outputs", "settings"] };
         else if (operation === "list") result = [{ id: "42", title: "Scene", type: "scene", path: "/test/42", preview: "/tmp/absolute-preview.png", tags: [] }, { id: "43", title: "Other video", type: "video", path: "/other/video", preview: "", tags: [] }];
         else if (operation === "outputs") result = Object.keys(states).map(name => ({ name: name, wallpaper: { path: states[name].path, kind: states[name].kind, state: states[name].state } }));
         else if (operation === "status") result = JSON.parse(JSON.stringify(states));
-        else if (operation === "set") {
+        else if (operation === "settings") {
+            if (request.set) {
+                defaults = Object.assign({}, defaults, request.set);
+                for (const name of Object.keys(states)) states[name].options = Object.assign({}, states[name].options, defaults);
+                Qt.callLater(() => root.eventReceived("settings", { settings: defaults }));
+            }
+            result = defaults;
+        } else if (operation === "set") {
             const names = request.output === "*" ? Object.keys(states) : [request.output];
             for (const name of names) {
-                states[name].options = request.options;
+                states[name].options = Object.assign({}, defaults, request.options);
                 states[name].path = request.path;
             }
+            Qt.callLater(() => root.eventReceived("state", {}));
         } else if (operation === "props") {
             if (request.set) {
                 if (states[request.output].path !== "/test/42") { console.error("Property leaked to another project"); Qt.exit(1); }

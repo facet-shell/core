@@ -22,9 +22,9 @@ Singleton {
     property var glintItems: []
     property var glintOutputs: []
     property var glintStatus: ({})
+    property var glintSettings: null
     property var sceneSettings: ({})
     property var propertyRequests: ({})
-    property var optionRequests: ({})
     property var pendingPauses: ({})
     property var settings: ({ backend: "both", fps: 60, volume: 0, scaling: "fill", pause: true, mature: true, screens: {} })
     property var queue: []
@@ -37,6 +37,7 @@ Singleton {
                 glint.outputs();
                 glint.list("");
                 glint.send("status");
+                glint.send("settings");
             } else {
                 glintError = "Connecting to glint…";
             }
@@ -62,6 +63,10 @@ Singleton {
     }
 
     function optionsFor(output) { return State.optionsFor(glintStatus, output || "*"); }
+    function globalOptions() {
+        const values = glintSettings || optionsFor("*");
+        return Object.assign({}, values, { mixed: {}, count: 1 });
+    }
     function propertiesFor(output, project) { return State.propertiesFor(sceneSettings, glintStatus, output, project); }
     function propertyLabel(property) { return State.propertyLabel(property); }
 
@@ -70,9 +75,10 @@ Singleton {
         if (useGlint) {
             if (!glintActive) { glintError = "Glint is not connected. Start the engine first."; return; }
             glintError = "";
-            const options = optionsFor(target);
+            const options = globalOptions();
             glint.setWallpaper(target, path, { fps: options.fps, scaling: options.scaling,
-                volume: options.volume, mute: options.mute, transition: options.transition, duration: options.duration });
+                volume: options.volume, mute: options.mute, transition: options.transition,
+                duration: options.duration, color: options.color });
             return;
         }
         queue = queue.filter(args => !(args[0] === "set" && (target === "*" || args[2] === target)));
@@ -89,8 +95,7 @@ Singleton {
         const allowed = ["fps", "scaling", "volume", "mute", "transition", "duration", "color"];
         if (!Object.keys(changes).length || Object.keys(changes).some(key => !allowed.includes(key))) return;
         glintError = "";
-        const id = glint.send("status");
-        if (id >= 0) optionRequests[id] = { output: output || "*", changes: changes };
+        glint.send("settings", { set: changes });
     }
 
     function option(key, value) {
@@ -156,9 +161,9 @@ Singleton {
                 root.glintReady = false;
                 root.glintOutputs = [];
                 root.glintStatus = {};
+                root.glintSettings = null;
                 root.sceneSettings = {};
                 root.propertyRequests = {};
-                root.optionRequests = {};
                 if (root.useGlint) root.glintError = "Glint is not connected";
                 root.updateItems();
             }
@@ -166,12 +171,12 @@ Singleton {
         onResponse: (id, operation, result) => {
             result = JSON.parse(JSON.stringify(result));
             if (operation === "version") {
-                root.glintReady = Array.isArray(result.operations) && result.operations.includes("list");
+                root.glintReady = Array.isArray(result.operations) && result.operations.includes("list") && result.operations.includes("settings");
                 if (root.glintReady) {
                     root.glintError = "";
-                    outputs(); list(""); send("status");
+                    outputs(); list(""); send("status"); send("settings");
                     for (const reason of Object.keys(root.pendingPauses)) pause("*", reason);
-                } else root.glintError = "Update glint to use its library API";
+                } else root.glintError = "Update glint to use global wallpaper settings";
             } else if (operation === "outputs") {
                 root.glintOutputs = Array.isArray(result) ? result : [];
             } else if (operation === "status") {
@@ -179,13 +184,8 @@ Singleton {
                 const common = root.optionsFor("*");
                 root.settings = Object.assign({}, root.settings, { backend: "both", fps: common.fps,
                     scaling: common.scaling, volume: Math.round(common.volume * 100) });
-                const change = root.optionRequests[id];
-                if (change) {
-                    delete root.optionRequests[id];
-                    const requests = State.optionRequests(result, change.output, change.changes);
-                    if (!requests.length) root.glintError = "No running wallpaper on the selected display";
-                    for (const request of requests) send(request.op, request);
-                }
+            } else if (operation === "settings") {
+                root.glintSettings = result;
             } else if (operation === "list") {
                 root.glintItems = State.libraryItems(result);
                 root.updateItems(); root.loading = false;
@@ -201,12 +201,13 @@ Singleton {
             }
         }
         onRequestFailed: (id, operation, message) => {
-            delete root.propertyRequests[id]; delete root.optionRequests[id];
+            delete root.propertyRequests[id];
             if (operation !== "subscribe") root.glintError = message;
             if (operation === "list") root.loading = false;
         }
         onEventReceived: (event, data) => {
             if (event === "outputs" || event === "state") { outputs(); send("status"); }
+            if (event === "settings") { root.glintSettings = data.settings; outputs(); send("status"); }
             if (event === "props" && data.output) root.refreshSceneSettings(data.output);
             if (event === "error") root.glintError = data.message || "Wallpaper failed";
         }

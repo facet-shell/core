@@ -54,6 +54,7 @@ if [ "$1" = outputs ]; then [ "${FACET_TEST_RUNNING:-0}" = 1 ] || [ -f "$FACET_T
     (tools / 'pgrep').write_text('#!/bin/sh\nexit 1\n')
     for tool in ('pkill', 'pgrep'): (tools / tool).chmod(0o755)
     assignment = {'all': {'path': '/test/a b', 'options': {'volume': 0.8, 'fps': 144}},
+                  'settings': {'fps': 144, 'volume': 0.8, 'mute': True},
                   'outputs': {'DP-2': {'path': '/test/video', 'options': {'volume': 0.3, 'scaling': 'fit'}}},
                   'properties': {'/test/a b': {'clock': True}}}
     new.write_text(json.dumps(assignment))
@@ -62,6 +63,7 @@ if [ "$1" = outputs ]; then [ "${FACET_TEST_RUNNING:-0}" = 1 ] || [ -f "$FACET_T
     assert saved['all']['path'] == '/test/a b' and saved['all']['options']['volume'] == 0
     assert saved['outputs']['DP-2']['path'] == '/test/video' and saved['outputs']['DP-2']['options']['volume'] == 0
     assert saved['all']['options']['fps'] == 144 and saved['properties'] == assignment['properties']
+    assert saved['settings'] == {'fps': 144, 'volume': 0, 'mute': False}
     print('Glint migration, daemon reuse, silent restart and local-file listing passed')
 
 # A detached daemon must survive its launcher and terminal hangup.
