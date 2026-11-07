@@ -19,8 +19,8 @@ with tempfile.TemporaryDirectory(prefix='facet-glint-helper-') as directory:
     executable = task_root / 'glint'
     executable.write_text('''#!/bin/sh
 printf '%s\\n' "$*" >>"$FACET_TEST_GLINT_LOG"
-if [ "$1" = outputs ]; then [ "${FACET_TEST_RUNNING:-0}" = 1 ]; exit $?; fi
-[ "$1" = --daemon ]
+if [ "$1" = outputs ]; then [ "${FACET_TEST_RUNNING:-0}" = 1 ] || [ -f "$FACET_TEST_GLINT_LOG.started" ]; exit $?; fi
+[ "$1" = --daemon ] && touch "$FACET_TEST_GLINT_LOG.started"
 ''')
     executable.chmod(0o755)
     helper = task_root / 'start'
@@ -50,4 +50,58 @@ if [ "$1" = outputs ]; then [ "${FACET_TEST_RUNNING:-0}" = 1 ]; exit $?; fi
     result = subprocess.run(['bash', str(root / 'wallpaper/.local/bin/facet-wallpaper'), 'list-local'], env=env, check=True, capture_output=True, text=True)
     items = json.loads(result.stdout)
     assert {item['kind'] for item in items} == {'image', 'video'}, items
-    print('Glint migration, existing-daemon reuse and local-file listing passed')
+    (tools / 'pkill').write_text('#!/bin/sh\nrm -f "$FACET_TEST_GLINT_LOG.started"\n')
+    (tools / 'pgrep').write_text('#!/bin/sh\nexit 1\n')
+    for tool in ('pkill', 'pgrep'): (tools / tool).chmod(0o755)
+    assignment = {'all': {'path': '/test/a b', 'options': {'volume': 0.8, 'fps': 144}},
+                  'outputs': {'DP-2': {'path': '/test/video', 'options': {'volume': 0.3, 'scaling': 'fit'}}},
+                  'properties': {'/test/a b': {'clock': True}}}
+    new.write_text(json.dumps(assignment))
+    subprocess.run(['bash', str(helper), '--restart', '--silent'], env=env, check=True, timeout=8)
+    saved = json.loads(new.read_text())
+    assert saved['all']['path'] == '/test/a b' and saved['all']['options']['volume'] == 0
+    assert saved['outputs']['DP-2']['path'] == '/test/video' and saved['outputs']['DP-2']['options']['volume'] == 0
+    assert saved['all']['options']['fps'] == 144 and saved['properties'] == assignment['properties']
+    print('Glint migration, daemon reuse, silent restart and local-file listing passed')
+
+# A detached daemon must survive its launcher and terminal hangup.
+with tempfile.TemporaryDirectory(prefix='facet-glint-detached-') as directory:
+    import signal
+    import time
+    task_root = pathlib.Path(directory)
+    executable = task_root / 'glint'
+    executable.write_text('''#!/usr/bin/env python3
+import os, pathlib, signal, sys, time
+pidfile = pathlib.Path(os.environ['FACET_TEST_PID'])
+if sys.argv[1] == 'outputs':
+    try: os.kill(int(pidfile.read_text()), 0)
+    except (OSError, ValueError): sys.exit(1)
+    sys.exit(0)
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+pidfile.write_text(str(os.getpid()))
+while True:
+    pidfile.with_suffix('.tick').write_text(str(time.monotonic()))
+    time.sleep(0.05)
+''')
+    executable.chmod(0o755)
+    helper = task_root / 'start'
+    helper.write_text((root / 'wallpaper/.local/bin/facet-glint-start').read_text().replace('glint="$HOME/.local/bin/glint"', 'glint="' + str(executable) + '"'))
+    env = dict(os.environ, XDG_STATE_HOME=str(task_root / 'state'), WAYLAND_DISPLAY='wayland-test', FACET_TEST_PID=str(task_root / 'pid'))
+    pid = None
+    try:
+        subprocess.run(['bash', str(helper)], env=env, check=True, timeout=8)
+        pid = int((task_root / 'pid').read_text())
+        assert os.getsid(pid) == pid, 'daemon still shares the terminal session'
+        tick = task_root / 'pid.tick'
+        before = float(tick.read_text())
+        os.kill(pid, signal.SIGHUP)
+        time.sleep(0.15)
+        assert float(tick.read_text()) > before, 'daemon stopped after hangup'
+        os.kill(pid, 0)
+        subprocess.run(['bash', str(helper)], env=env, check=True, timeout=2)
+        assert int((task_root / 'pid').read_text()) == pid, 'second daemon was started'
+    finally:
+        if pid is not None:
+            try: os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError: pass
+    print('Glint daemon survives launcher exit and hangup, and a second launch reuses it')

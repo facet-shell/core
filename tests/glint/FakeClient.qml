@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "Fixture.js" as Fixture
 
 Scope {
     id: root
@@ -14,7 +15,7 @@ Scope {
     signal response(int id, string operation, var result)
     signal requestFailed(int id, string operation, string message)
     signal eventReceived(string event, var data)
-    Component.onCompleted: Qt.callLater(() => connected = enabled)
+    Component.onCompleted: { Fixture.client = root; Qt.callLater(() => connected = enabled); }
     onEnabledChanged: Qt.callLater(() => connected = enabled)
 
     function send(operation, fields) {
@@ -23,7 +24,7 @@ Scope {
         console.log("FAKE_REQUEST", JSON.stringify(request));
         let result = {};
         if (operation === "version") result = { operations: ["list", "set", "status", "props", "outputs"] };
-        else if (operation === "list") result = [{ id: "42", title: "Scene", type: "scene", path: "/test/42", preview: "/tmp/absolute-preview.png", tags: [] }];
+        else if (operation === "list") result = [{ id: "42", title: "Scene", type: "scene", path: "/test/42", preview: "/tmp/absolute-preview.png", tags: [] }, { id: "43", title: "Other video", type: "video", path: "/other/video", preview: "", tags: [] }];
         else if (operation === "outputs") result = Object.keys(states).map(name => ({ name: name, wallpaper: { path: states[name].path, kind: states[name].kind, state: states[name].state } }));
         else if (operation === "status") result = JSON.parse(JSON.stringify(states));
         else if (operation === "set") {

@@ -53,8 +53,8 @@ Singleton {
 
     function current(output) {
         if (useGlint) {
-            if (output && output !== "*") return glintOutputs.find(o => o.name === output)?.wallpaper?.path ?? "";
-            const paths = glintOutputs.map(o => o.wallpaper?.path ?? "");
+            if (output && output !== "*") return State.libraryPath(glintOutputs.find(o => o.name === output)?.wallpaper?.path ?? "", items);
+            const paths = glintOutputs.map(o => State.libraryPath(o.wallpaper?.path ?? "", items));
             return paths.length && paths.every(path => path === paths[0]) ? paths[0] : "";
         }
         const screens = settings.screens ?? {};

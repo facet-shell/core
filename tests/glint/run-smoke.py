@@ -29,6 +29,7 @@ with tempfile.TemporaryDirectory(prefix='facet-glint-') as directory:
     for name in ('Wallpapers.qml', 'WallpaperState.js'):
         shutil.copy(root / 'quickshell/.config/quickshell/services' / name, config / 'services' / name)
     shutil.copy(root / 'tests/glint/FakeClient.qml', config / 'services/GlintClient.qml')
+    shutil.copy(root / 'tests/glint/Fixture.js', config / 'services/Fixture.js')
     shutil.copy(style / 'tests/GlintViewsSmoke.qml' if style else root / 'tests/glint/ServiceSmoke.qml', config / 'shell.qml')
     helper = config / 'facet-wallpaper'
     helper.write_text('#!/bin/sh\nprintf \'%s\\n\' "$*" >>"$FACET_TEST_COMMANDS"\nprintf \'%s\\n\' \'[{"id":"local","title":"Local video","kind":"video","source":"file","path":"/test/local.mp4","preview":""}]\'\n')

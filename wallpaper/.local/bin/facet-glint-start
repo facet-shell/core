@@ -4,6 +4,26 @@ set -euo pipefail
 state_root=${XDG_STATE_HOME:-"$HOME/.local/state"}
 glint="$HOME/.local/bin/glint"
 [[ -x $glint ]] || { echo "glint is not installed: run facet install wallpaper" >&2; exit 1; }
+restart=false
+silent=false
+for option in "$@"; do
+    case "$option" in
+        --restart) restart=true ;;
+        --silent) silent=true ;;
+        *) echo "usage: facet-glint-start [--restart] [--silent]" >&2; exit 2 ;;
+    esac
+done
+if $restart; then
+    pkill -TERM -u "$(id -u)" -x glint 2>/dev/null || true
+    for ((attempt=0; attempt<50; attempt++)); do
+        if ! pgrep -u "$(id -u)" -x glint >/dev/null; then break; fi
+        sleep 0.1
+    done
+    if pgrep -u "$(id -u)" -x glint >/dev/null; then
+        echo "glint did not stop; check the running process before retrying" >&2
+        exit 1
+    fi
+fi
 if "$glint" outputs --json >/dev/null 2>&1; then exit 0; fi
 legacy="$state_root/facet/wallpaper.json"
 display=${WAYLAND_DISPLAY:-wayland-0}
@@ -37,5 +57,20 @@ if [[ ! -e $state && -r $legacy ]] && command -v jq >/dev/null; then
     rm -f "$tmp"
     trap - EXIT
 fi
+if $silent && [[ -f $state ]]; then
+    tmp=$(mktemp "${state}.XXXXXX")
+    trap 'rm -f "$tmp"' EXIT
+    jq 'if (.all | type) == "object" then .all.options.volume = 0 | .all.options.mute = false else . end
+        | if (.outputs | type) == "object" then .outputs |= with_entries(.value.options.volume = 0 | .value.options.mute = false) else . end' "$state" >"$tmp"
+    chmod --reference="$state" "$tmp"
+    mv "$tmp" "$state"
+    trap - EXIT
+fi
 mkdir -p "$state_root/glint"
-exec "$glint" --daemon >>"$state_root/glint/daemon.log" 2>&1
+nohup setsid --fork "$glint" --daemon </dev/null >>"$state_root/glint/daemon.log" 2>&1
+for ((attempt=0; attempt<50; attempt++)); do
+    if "$glint" outputs --json >/dev/null 2>&1; then exit 0; fi
+    sleep 0.1
+done
+echo "glint did not start; see $state_root/glint/daemon.log" >&2
+exit 1

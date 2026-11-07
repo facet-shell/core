@@ -58,3 +58,11 @@ function libraryItems(items) {
             tags: item.tags || [], rating: item.rating || "", path: item.path,
             preview: !item.preview ? "" : item.preview.startsWith("/") ? item.preview : `${item.path}/${item.preview}` }));
 }
+
+function libraryPath(path, items) {
+    if (!path || items.some(item => item.path === path)) return path || "";
+    const projects = items.filter(item => item.source === "workshop" && item.kind === "video"
+        && path.startsWith(item.path + "/"));
+    projects.sort((a, b) => b.path.length - a.path.length);
+    return projects.length ? projects[0].path : path;
+}
