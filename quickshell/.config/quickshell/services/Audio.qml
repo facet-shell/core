@@ -280,6 +280,19 @@ Singleton {
             node.audio.volume = Math.max(0, Math.min(1, value));
     }
 
+    // The speaker icon for a volume (0..1): off when muted or silent, then one more wave per
+    // third, so the bar, the OSD and the control center agree on the thresholds
+    function volumeIcon(volume, muted) {
+        const v = Number(volume) || 0;
+        if (muted || v < 0.005)
+            return "volume_off";
+        return v < 0.34 ? "volume_mute" : v < 0.67 ? "volume_down" : "volume_up";
+    }
+
+    function micIcon(muted) {
+        return muted ? "mic_off" : "mic";
+    }
+
     function toggleMute(node) {
         if (node?.audio)
             node.audio.muted = !node.audio.muted;
