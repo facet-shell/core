@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import qs.config
 
 // What every style starts with, before its own bar and panels: a style's shell.qml puts
 // `Core {}` first in its ShellRoot. Nothing in here draws anything.
@@ -60,6 +61,33 @@ Scope {
             function toggle(): void { mediaKeys.take()?.togglePlaying(); }
             function next(): void { mediaKeys.take()?.next(); }
             function prev(): void { mediaKeys.take()?.previous(); }
+        }
+
+        // The volume keys (and a keyboard's knob), see Config.volumeKeys
+        IpcHandler {
+            target: "volume"
+
+            function onGoxlr(): bool {
+                return Config.volumeKeys === "goxlr-system" && GoXLR.available && GoXLR.volumes.system !== undefined;
+            }
+
+            function step(by: real): void {
+                if (onGoxlr()) {
+                    GoXLR.setChannelVolume("System", (GoXLR.volumes.system ?? 0) + by);
+                } else if (Audio.defaultSink) {
+                    const now = Audio.defaultSink.audio?.volume ?? 0;
+                    Audio.setVolume(Audio.defaultSink, Math.max(0, Math.min(1, now + by / 100)));
+                }
+            }
+            function up(): void { step(5); }
+            function down(): void { step(-5); }
+            // The System channel has a mute only where it sits on a fader
+            function mute(): void {
+                if (onGoxlr() && GoXLR.systemOnFader)
+                    GoXLR.setMuted("system", !GoXLR.state("system").muted);
+                else if (Audio.defaultSink)
+                    Audio.toggleMute(Audio.defaultSink);
+            }
         }
     }
 }

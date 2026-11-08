@@ -188,6 +188,10 @@ Singleton {
     // outline so they read over any game. voiceOverlayPos keeps the spot per screen,
     // { "DP-1": [x, y] }, set by moving it (Super+Shift+V); without one: left, under the bar.
     readonly property string voiceOverlayWhen: user.voiceOverlayWhen ?? "hidden"
+    // What the volume keys and a keyboard's knob turn: "goxlr-system" (the GoXLR's System
+    // channel, the control center's big slider) or "output" (the default output in PipeWire);
+    // without a GoXLR always the output
+    readonly property string volumeKeys: user.volumeKeys ?? "goxlr-system"
     readonly property string voiceOverlayLook: user.voiceOverlayLook ?? "list"
     readonly property string voiceOverlayFeed: user.voiceOverlayFeed ?? "overlay"
     readonly property real voiceOverlaySize: user.voiceOverlaySize ?? 1

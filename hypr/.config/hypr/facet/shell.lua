@@ -83,6 +83,11 @@ take("XF86AudioPlay", shell("player", "toggle"), { locked = true, description = 
 take("XF86AudioPause", shell("player", "toggle"), { locked = true, description = "facet shell · media: play / pause" })
 take("XF86AudioNext", shell("player", "next"), { locked = true, description = "facet shell · media: next track" })
 take("XF86AudioPrev", shell("player", "prev"), { locked = true, description = "facet shell · media: previous track" })
+-- Volume keys and a keyboard's knob: the shell turns what settings → sound → output says
+-- (the GoXLR's System channel or the default output)
+take("XF86AudioRaiseVolume", shell("volume", "up"), { locked = true, repeating = true, description = "facet shell · volume up" })
+take("XF86AudioLowerVolume", shell("volume", "down"), { locked = true, repeating = true, description = "facet shell · volume down" })
+take("XF86AudioMute", shell("volume", "mute"), { locked = true, description = "facet shell · mute" })
 
 -- Screenshots (the distro binds Print to grim + slurp; the shell has its own picker)
 take("Print", shell("screenshot", "region"), { description = "facet shell · screenshot: region or window" })
