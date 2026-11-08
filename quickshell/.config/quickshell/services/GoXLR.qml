@@ -378,6 +378,36 @@ Singleton {
         command({ LoadProfile: [name, false] }, true);
     }
 
+    // The utility starts with the volumes stored in the profile, and it only stores them on an
+    // explicit save, so after a reboot every channel sat at the levels of the last save, not
+    // where the faders were. A few seconds after the volumes settle the running profile is
+    // saved (SaveProfile), the first status after connecting does not count
+    property var savedVolumes: null
+
+    onVolumesChanged: {
+        if (!available || savedVolumes === null) {
+            savedVolumes = volumes;
+            return;
+        }
+        if (JSON.stringify(volumes) !== JSON.stringify(savedVolumes))
+            saveProfile.restart();
+    }
+    onAvailableChanged: if (!available) {
+        saveProfile.stop();
+        savedVolumes = null;
+    }
+
+    Timer {
+        id: saveProfile
+        interval: 4000
+        onTriggered: {
+            if (!root.available || !root.wanted)
+                return;
+            root.savedVolumes = root.volumes;
+            root.command({ SaveProfile: [] }, false);
+        }
+    }
+
     function stepSystem(delta) {
         setChannelVolume("System", (volumes.system ?? 0) + delta);
     }
