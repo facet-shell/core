@@ -1,0 +1,533 @@
+#!/usr/bin/env python3
+"""facet-calendar – Google and iCloud calendars for the dashboard (services/Calendar.qml).
+
+Python's standard library only, nothing to install. iCloud goes over CalDAV with an
+app-specific password, Google over the Calendar API with an OAuth login in the browser.
+Passwords and tokens live in the keyring (secret-tool, service "facet-calendar"); the list of
+accounts in ~/.config/facet/calendar.json (no secrets in it).
+
+  facet-calendar setup icloud               asks for the Apple ID and an app-specific password
+  facet-calendar setup google <client.json> logs in through the browser with your own OAuth
+                                            desktop client (the JSON Google Cloud hands out)
+  facet-calendar remove <account>           forgets an account ("icloud:<apple id>", "google:<mail>")
+  facet-calendar status                     the accounts, as JSON
+  facet-calendar events <from> <to>         events from <from> up to <to> (YYYY-MM-DD, <to> not
+                                            included) as one JSON object:
+                                            { accounts, calendars: [{ id, name, color, account,
+                                            writable }], events: [{ id, title, start, end, allDay,
+                                            calendar, color, location }], errors: [] }
+                                            start/end: local "YYYY-MM-DDTHH:MM" or "YYYY-MM-DD"
+  facet-calendar add <calendar> <title> <start> [<end>]
+                                            a new event; start/end as above, a date alone makes
+                                            an all-day event, no end: one hour (or one day)
+"""
+
+import base64
+import datetime as dt
+import getpass
+import hashlib
+import http.server
+import json
+import os
+import secrets
+import subprocess
+import sys
+import threading
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+import webbrowser
+import xml.etree.ElementTree as ET
+from zoneinfo import ZoneInfo
+
+CONFIG = os.path.expanduser("~/.config/facet/calendar.json")
+SERVICE = "facet-calendar"
+UA = "facet-calendar/1"
+
+
+def local_zone():
+    """The system's zone with its DST rules (a fixed offset would shift summer events by an hour)."""
+    try:
+        name = os.environ.get("TZ") or os.path.realpath("/etc/localtime").split("zoneinfo/", 1)[1]
+        return ZoneInfo(name.lstrip(":"))
+    except Exception:
+        return dt.datetime.now().astimezone().tzinfo
+
+
+LOCAL = local_zone()
+
+NS = {"d": "DAV:", "c": "urn:ietf:params:xml:ns:caldav", "a": "http://apple.com/ns/ical/"}
+
+
+def die(msg, code=1):
+    print(f"facet-calendar: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+# ── Config and keyring ─────────────────────────────────────────
+
+def load_config():
+    try:
+        with open(CONFIG) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"accounts": []}
+
+
+def save_config(cfg):
+    os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+    fd = os.open(CONFIG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(cfg, f, indent=2)
+
+
+def secret_get(account):
+    r = subprocess.run(["secret-tool", "lookup", "service", SERVICE, "account", account],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or r.stdout == "":
+        raise RuntimeError(f"no secret for {account} in the keyring, run facet-calendar setup again")
+    return r.stdout
+
+
+def secret_set(account, value):
+    r = subprocess.run(["secret-tool", "store", "--label", f"facet calendar ({account})",
+                        "service", SERVICE, "account", account], input=value, text=True)
+    if r.returncode != 0:
+        die("could not store the secret in the keyring (is it unlocked?)")
+
+
+def secret_clear(account):
+    subprocess.run(["secret-tool", "clear", "service", SERVICE, "account", account])
+
+
+# ── HTTP ───────────────────────────────────────────────────────
+
+def request(method, url, body=None, headers=None, auth=None, follow=3):
+    data = body.encode() if isinstance(body, str) else body
+    req = urllib.request.Request(url, data=data, method=method)
+    req.add_header("User-Agent", UA)
+    for k, v in (headers or {}).items():
+        req.add_header(k, v)
+    if auth:
+        req.add_header("Authorization", auth)
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return r.status, r.read().decode("utf-8", "replace"), r.geturl()
+    except urllib.error.HTTPError as e:
+        # urllib follows redirects for GET only; CalDAV servers send them for PROPFIND too
+        if e.code in (301, 302, 307, 308) and follow > 0 and e.headers.get("Location"):
+            return request(method, urllib.parse.urljoin(url, e.headers["Location"]), body, headers, auth, follow - 1)
+        text = e.read().decode("utf-8", "replace")
+        raise RuntimeError(f"{method} {urllib.parse.urlsplit(url).netloc} answered {e.code}: {text[:200].strip()}")
+
+
+# ── Times ──────────────────────────────────────────────────────
+
+def parse_ics_time(value, params):
+    """An iCalendar DATE or DATE-TIME as (aware local datetime | date, all_day)."""
+    if params.get("VALUE") == "DATE" or (len(value) == 8 and value.isdigit()):
+        return dt.date(int(value[:4]), int(value[4:6]), int(value[6:8])), True
+    t = dt.datetime.strptime(value.rstrip("Z")[:15], "%Y%m%dT%H%M%S")
+    if value.endswith("Z"):
+        t = t.replace(tzinfo=dt.timezone.utc)
+    elif "TZID" in params:
+        try:
+            t = t.replace(tzinfo=ZoneInfo(params["TZID"].strip('"')))
+        except Exception:
+            t = t.replace(tzinfo=LOCAL)
+    else:
+        t = t.replace(tzinfo=LOCAL)
+    return t.astimezone(LOCAL), False
+
+
+def show(t):
+    return t.isoformat() if isinstance(t, dt.date) and not isinstance(t, dt.datetime) else t.strftime("%Y-%m-%dT%H:%M")
+
+
+def parse_input_time(text):
+    """"YYYY-MM-DD" → (date, True), "YYYY-MM-DDTHH:MM" → (aware local datetime, False)."""
+    if "T" in text:
+        return dt.datetime.strptime(text[:16], "%Y-%m-%dT%H:%M").replace(tzinfo=LOCAL), False
+    return dt.date.fromisoformat(text), True
+
+
+def utc_stamp(t):
+    return t.astimezone(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+# ── iCalendar ──────────────────────────────────────────────────
+
+def unfold(text):
+    lines = []
+    for raw in text.replace("\r\n", "\n").split("\n"):
+        if raw[:1] in (" ", "\t") and lines:
+            lines[-1] += raw[1:]
+        else:
+            lines.append(raw)
+    return lines
+
+
+def unescape(v):
+    return v.replace("\\n", " ").replace("\\N", " ").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
+
+
+def escape(v):
+    return v.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+
+
+def vevents(text):
+    """Every VEVENT as a dict of name → (value, params); nested VALARMs are skipped."""
+    out, cur, depth = [], None, 0
+    for line in unfold(text):
+        if line == "BEGIN:VEVENT":
+            cur, depth = {}, 0
+            continue
+        if cur is None:
+            continue
+        if line.startswith("BEGIN:"):
+            depth += 1
+            continue
+        if line.startswith("END:"):
+            if depth == 0 and line == "END:VEVENT":
+                out.append(cur)
+                cur = None
+            else:
+                depth -= 1
+            continue
+        if depth or ":" not in line:
+            continue
+        head, value = line.split(":", 1)
+        name, *rest = head.split(";")
+        params = dict(p.split("=", 1) for p in rest if "=" in p)
+        cur.setdefault(name.upper(), (value, params))
+    return out
+
+
+def parse_duration(v):
+    sign = -1 if v.startswith("-") else 1
+    v = v.lstrip("+-").lstrip("P")
+    days = secs = 0
+    num = ""
+    in_time = False
+    for ch in v:
+        if ch == "T":
+            in_time = True
+        elif ch.isdigit():
+            num += ch
+        else:
+            n = int(num or 0)
+            num = ""
+            if ch == "W":
+                days += 7 * n
+            elif ch == "D":
+                days += n
+            elif ch == "H":
+                secs += 3600 * n
+            elif ch == "M" and in_time:
+                secs += 60 * n
+            elif ch == "S":
+                secs += n
+    return sign * dt.timedelta(days=days, seconds=secs)
+
+
+# ── iCloud (CalDAV) ────────────────────────────────────────────
+
+def dav(method, url, body, user, password, depth="0"):
+    auth = "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
+    status, text, final = request(method, url, body, {"Depth": depth, "Content-Type": "application/xml; charset=utf-8"}, auth)
+    return ET.fromstring(text) if text.strip() else None, final
+
+
+def href_of(tree, path):
+    el = tree.find(path, NS) if tree is not None else None
+    return el.text.strip() if el is not None and el.text else None
+
+
+def icloud_calendars(user, password):
+    base = "https://caldav.icloud.com/"
+    tree, final = dav("PROPFIND", base, '<d:propfind xmlns:d="DAV:"><d:prop><d:current-user-principal/></d:prop></d:propfind>', user, password)
+    principal = urllib.parse.urljoin(final, href_of(tree, ".//d:current-user-principal/d:href") or "")
+    tree, final = dav("PROPFIND", principal, '<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><c:calendar-home-set/></d:prop></d:propfind>', user, password)
+    home = urllib.parse.urljoin(final, href_of(tree, ".//c:calendar-home-set/d:href") or "")
+    body = ('<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" xmlns:a="http://apple.com/ns/ical/">'
+            "<d:prop><d:displayname/><d:resourcetype/><a:calendar-color/><c:supported-calendar-component-set/>"
+            "<d:current-user-privilege-set/></d:prop></d:propfind>")
+    tree, final = dav("PROPFIND", home, body, user, password, depth="1")
+    cals = []
+    for resp in tree.findall("d:response", NS):
+        if resp.find(".//d:resourcetype/c:calendar", NS) is None:
+            continue
+        comps = [c.get("name") for c in resp.findall(".//c:supported-calendar-component-set/c:comp", NS)]
+        if comps and "VEVENT" not in comps:
+            continue
+        color = (resp.findtext(".//a:calendar-color", "", NS) or "").strip()
+        writable = resp.find(".//d:current-user-privilege-set//d:write", NS) is not None \
+            or resp.find(".//d:current-user-privilege-set//d:all", NS) is not None \
+            or resp.find(".//d:current-user-privilege-set", NS) is None
+        cals.append({
+            "url": urllib.parse.urljoin(final, resp.findtext("d:href", "", NS).strip()),
+            "name": (resp.findtext(".//d:displayname", "", NS) or "Calendar").strip(),
+            # Apple writes #RRGGBBAA
+            "color": color[:7] if color.startswith("#") else "",
+            "writable": writable,
+        })
+    return cals
+
+
+def icloud_events(acc, start, end):
+    password = secret_get(acc["key"])
+    cals, events = [], []
+    s, e = utc_stamp(dt.datetime.combine(start, dt.time(), LOCAL)), utc_stamp(dt.datetime.combine(end, dt.time(), LOCAL))
+    body = ('<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><c:calendar-data>'
+            f'<c:expand start="{s}" end="{e}"/></c:calendar-data></d:prop>'
+            '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">'
+            f'<c:time-range start="{s}" end="{e}"/></c:comp-filter></c:comp-filter></c:filter></c:calendar-query>')
+    for cal in icloud_calendars(acc["user"], password):
+        cid = f"{acc['key']}|{cal['url']}"
+        color = cal["color"] or "#7aa2f7"
+        cals.append({"id": cid, "name": cal["name"], "color": color, "account": acc["key"], "writable": cal["writable"]})
+        tree, _ = dav("REPORT", cal["url"], body, acc["user"], password, depth="1")
+        for data in (tree.findall(".//c:calendar-data", NS) if tree is not None else []):
+            for ev in vevents(data.text or ""):
+                if "DTSTART" not in ev:
+                    continue
+                st, all_day = parse_ics_time(*ev["DTSTART"])
+                if "DTEND" in ev:
+                    en, _ = parse_ics_time(*ev["DTEND"])
+                elif "DURATION" in ev:
+                    en = st + parse_duration(ev["DURATION"][0])
+                else:
+                    en = st + (dt.timedelta(days=1) if all_day else dt.timedelta(0))
+                # A server that ignores <expand> hands back the series' first date; skip what lies outside
+                if (en <= start if all_day else en.date() < start) or (st if all_day else st.date()) >= end:
+                    continue
+                events.append({
+                    "id": ev.get("UID", ("", {}))[0] + ev.get("RECURRENCE-ID", ("", {}))[0],
+                    "title": unescape(ev.get("SUMMARY", ("(no title)", {}))[0]),
+                    "start": show(st), "end": show(en), "allDay": all_day,
+                    "calendar": cid, "color": color,
+                    "location": unescape(ev.get("LOCATION", ("", {}))[0]),
+                })
+    return cals, events
+
+
+def icloud_add(acc, cal_url, title, st, en, all_day):
+    uid = f"{uuid.uuid4()}@facet"
+    if all_day:
+        times = f"DTSTART;VALUE=DATE:{st.strftime('%Y%m%d')}\r\nDTEND;VALUE=DATE:{en.strftime('%Y%m%d')}"
+    else:
+        times = f"DTSTART:{utc_stamp(st)}\r\nDTEND:{utc_stamp(en)}"
+    ics = ("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//facet//calendar//EN\r\nBEGIN:VEVENT\r\n"
+           f"UID:{uid}\r\nDTSTAMP:{utc_stamp(dt.datetime.now(dt.timezone.utc))}\r\n{times}\r\n"
+           f"SUMMARY:{escape(title)}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+    auth = "Basic " + base64.b64encode(f"{acc['user']}:{secret_get(acc['key'])}".encode()).decode()
+    url = cal_url.rstrip("/") + f"/{uuid.uuid4()}.ics"
+    request("PUT", url, ics, {"Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*"}, auth)
+
+
+# ── Google (Calendar API, OAuth) ───────────────────────────────
+
+GOOGLE_SCOPE = "https://www.googleapis.com/auth/calendar"
+GOOGLE_API = "https://www.googleapis.com/calendar/v3"
+
+
+def google_token(acc):
+    stored = json.loads(secret_get(acc["key"]))
+    form = urllib.parse.urlencode({
+        "client_id": stored["client_id"], "client_secret": stored["client_secret"],
+        "refresh_token": stored["refresh_token"], "grant_type": "refresh_token",
+    })
+    _, text, _ = request("POST", "https://oauth2.googleapis.com/token", form, {"Content-Type": "application/x-www-form-urlencoded"})
+    return "Bearer " + json.loads(text)["access_token"]
+
+
+def google_get(url, auth):
+    _, text, _ = request("GET", url, None, None, auth)
+    return json.loads(text)
+
+
+def google_events(acc, start, end):
+    auth = google_token(acc)
+    cals, events = [], []
+    items = google_get(f"{GOOGLE_API}/users/me/calendarList?minAccessRole=reader", auth).get("items", [])
+    tmin = dt.datetime.combine(start, dt.time(), LOCAL).isoformat()
+    tmax = dt.datetime.combine(end, dt.time(), LOCAL).isoformat()
+    for c in items:
+        if c.get("hidden") or c.get("selected") is False:
+            continue
+        cid = f"{acc['key']}|{c['id']}"
+        color = c.get("backgroundColor") or "#4285f4"
+        cals.append({"id": cid, "name": c.get("summaryOverride") or c.get("summary", "Calendar"), "color": color,
+                     "account": acc["key"], "writable": c.get("accessRole") in ("owner", "writer")})
+        q = urllib.parse.urlencode({"timeMin": tmin, "timeMax": tmax, "singleEvents": "true",
+                                    "orderBy": "startTime", "maxResults": "500"})
+        for ev in google_get(f"{GOOGLE_API}/calendars/{urllib.parse.quote(c['id'], safe='')}/events?{q}", auth).get("items", []):
+            if ev.get("status") == "cancelled":
+                continue
+            s, e = ev.get("start", {}), ev.get("end", {})
+            all_day = "date" in s
+            if all_day:
+                st, en = s["date"], e.get("date", s["date"])
+            else:
+                st = show(dt.datetime.fromisoformat(s["dateTime"]).astimezone(LOCAL))
+                en = show(dt.datetime.fromisoformat(e.get("dateTime", s["dateTime"])).astimezone(LOCAL))
+            events.append({"id": ev.get("id", ""), "title": ev.get("summary", "(no title)"), "start": st, "end": en,
+                           "allDay": all_day, "calendar": cid, "color": color, "location": ev.get("location", "")})
+    return cals, events
+
+
+def google_add(acc, cal_id, title, st, en, all_day):
+    auth = google_token(acc)
+    if all_day:
+        body = {"summary": title, "start": {"date": st.isoformat()}, "end": {"date": en.isoformat()}}
+    else:
+        body = {"summary": title, "start": {"dateTime": st.isoformat()}, "end": {"dateTime": en.isoformat()}}
+    request("POST", f"{GOOGLE_API}/calendars/{urllib.parse.quote(cal_id, safe='')}/events", json.dumps(body),
+            {"Content-Type": "application/json"}, auth)
+
+
+def google_login(client_file):
+    with open(os.path.expanduser(client_file)) as f:
+        raw = json.load(f)
+    client = raw.get("installed") or raw.get("web") or raw
+    cid, csecret = client.get("client_id"), client.get("client_secret")
+    if not cid or not csecret:
+        die("that file has no client_id/client_secret; download the OAuth client of type 'Desktop app'")
+
+    verifier = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    state = secrets.token_urlsafe(16)
+    got = {}
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
+            if q.get("state") == state:
+                got.update(q)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            ok = "code" in got
+            self.wfile.write(("<h2>%s</h2><p>You can close this tab.</p>" % ("Calendar connected" if ok else "Login failed")).encode())
+
+        def log_message(self, *a):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    redirect = f"http://127.0.0.1:{server.server_port}/"
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode({
+        "client_id": cid, "redirect_uri": redirect, "response_type": "code", "scope": GOOGLE_SCOPE + " email",
+        "access_type": "offline", "prompt": "consent", "state": state,
+        "code_challenge": challenge, "code_challenge_method": "S256",
+    })
+    print(f"Opening the Google login in your browser. If nothing opens:\n{url}\n")
+    webbrowser.open(url)
+    thread = threading.Thread(target=server.handle_request)
+    thread.start()
+    thread.join(300)
+    server.server_close()
+    if "code" not in got:
+        die(f"no answer from Google: {got.get('error', 'timed out')}")
+    form = urllib.parse.urlencode({"client_id": cid, "client_secret": csecret, "code": got["code"],
+                                   "code_verifier": verifier, "grant_type": "authorization_code", "redirect_uri": redirect})
+    _, text, _ = request("POST", "https://oauth2.googleapis.com/token", form, {"Content-Type": "application/x-www-form-urlencoded"})
+    tok = json.loads(text)
+    if "refresh_token" not in tok:
+        die("Google gave no refresh token; remove the app at myaccount.google.com/permissions and try again")
+    info = google_get("https://www.googleapis.com/oauth2/v3/userinfo", "Bearer " + tok["access_token"])
+    mail = info.get("email", "google")
+    key = f"google:{mail}"
+    secret_set(key, json.dumps({"client_id": cid, "client_secret": csecret, "refresh_token": tok["refresh_token"]}))
+    add_account({"key": key, "kind": "google", "user": mail})
+    print(f"Connected {mail}.")
+
+
+def icloud_login():
+    user = input("Apple ID (mail): ").strip()
+    password = getpass.getpass("App-specific password (appleid.apple.com → Sign-In and Security): ").strip()
+    try:
+        cals = icloud_calendars(user, password)
+    except Exception as e:
+        die(f"iCloud did not take it: {e}")
+    key = f"icloud:{user}"
+    secret_set(key, password)
+    add_account({"key": key, "kind": "icloud", "user": user})
+    print(f"Connected {user}: " + ", ".join(c["name"] for c in cals))
+
+
+def add_account(acc):
+    cfg = load_config()
+    cfg["accounts"] = [a for a in cfg["accounts"] if a["key"] != acc["key"]] + [acc]
+    save_config(cfg)
+
+
+# ── Commands ───────────────────────────────────────────────────
+
+def account_of(cal_id):
+    key, _, inner = cal_id.partition("|")
+    acc = next((a for a in load_config()["accounts"] if a["key"] == key), None)
+    if not acc:
+        die(f"no account {key}")
+    return acc, inner
+
+
+def cmd_events(a, b):
+    start, end = dt.date.fromisoformat(a), dt.date.fromisoformat(b)
+    accounts = load_config()["accounts"]
+    out = {"accounts": len(accounts), "calendars": [], "events": [], "errors": []}
+    for acc in accounts:
+        try:
+            cals, evs = (google_events if acc["kind"] == "google" else icloud_events)(acc, start, end)
+            out["calendars"] += cals
+            out["events"] += evs
+        except Exception as e:
+            out["errors"].append(f"{acc['key']}: {e}")
+    out["events"].sort(key=lambda e: (e["start"][:10], not e["allDay"], e["start"]))
+    print(json.dumps(out))
+
+
+def cmd_add(cal_id, title, start, end=None):
+    acc, inner = account_of(cal_id)
+    st, all_day = parse_input_time(start)
+    if end:
+        en, _ = parse_input_time(end)
+    else:
+        en = st + (dt.timedelta(days=1) if all_day else dt.timedelta(hours=1))
+    if all_day and isinstance(en, dt.datetime):
+        en = en.date()
+    if en <= st:
+        en = st + (dt.timedelta(days=1) if all_day else dt.timedelta(hours=1))
+    (google_add if acc["kind"] == "google" else icloud_add)(acc, inner, title.strip() or "(no title)", st, en, all_day)
+    print(json.dumps({"ok": True}))
+
+
+def main(argv):
+    if len(argv) < 2 or argv[1] in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return
+    cmd = argv[1]
+    if cmd == "setup" and len(argv) >= 3 and argv[2] == "icloud":
+        icloud_login()
+    elif cmd == "setup" and len(argv) >= 4 and argv[2] == "google":
+        google_login(argv[3])
+    elif cmd == "remove" and len(argv) == 3:
+        cfg = load_config()
+        cfg["accounts"] = [a for a in cfg["accounts"] if a["key"] != argv[2]]
+        save_config(cfg)
+        secret_clear(argv[2])
+    elif cmd == "status":
+        print(json.dumps(load_config()))
+    elif cmd == "events" and len(argv) == 4:
+        cmd_events(argv[2], argv[3])
+    elif cmd == "add" and len(argv) in (5, 6):
+        try:
+            cmd_add(*argv[2:])
+        except Exception as e:
+            die(str(e))
+    else:
+        die("unknown command, see facet-calendar --help", 2)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
