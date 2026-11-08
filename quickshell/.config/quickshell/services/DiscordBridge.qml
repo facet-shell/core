@@ -31,6 +31,10 @@ import qs.config
 //     | "toggle_mute" | "toggle_deafen" | "voice_state", channelId?, guildId? }
 //   { cmd: "list_contacts" } | { cmd: "open_dm" | "call_user", userId, channelId? } | { cmd: "send_dm", userId, content, channelId? }
 //   | { cmd: "reply_last", content } | { cmd: "send_message", channelId, content }   (a notification's reply field)
+//   | { cmd: "audio_sources" } → { type: "audio_sources", ok, list: [{ name, node }] }
+//   | { cmd: "start_stream", resolution, fps, hint, audio ("none" | "system" | "apps"), nodes } | { cmd: "stop_stream" }
+//   | { cmd: "stream_quality", resolution, fps, hint }   (onto the running stream)
+//     (problems come back as { type: "stream_error", error })
 Singleton {
     id: root
 
@@ -53,6 +57,82 @@ Singleton {
     // Your own Go Live stream: whether it runs and who watches it ({ id, name, avatar }, by name)
     property bool streamLive: false
     property var streamViewers: []
+
+    // ── Go Live from the shell (bar/StreamPanel.qml) ─────────
+
+    // Apps playing sound right now: [{ name, node }] (node: venmic's description, handed back)
+    property var audioSources: []
+    property bool audioSourcesOk: true
+    // How the last stream was set up; the panel starts from it
+    readonly property var streamSettings: Object.assign({
+        source: "screen:" + (Quickshell.screens[0]?.name ?? ""), resolution: "1080", fps: "60", hint: "motion",
+        audio: "system", exclude: [], include: []
+    }, Config.user.streamSettings ?? {})
+
+    function setStreamSetting(key, value) {
+        const next = Object.assign({}, streamSettings);
+        next[key] = value;
+        Config.set("streamSettings", next);
+    }
+
+    // The window picked in the panel for source "window" (a Hyprland address), not kept
+    property string shareWindow: ""
+    // What the running stream was started or last changed with (settings + window), so the
+    // panel can tell an edit apart; null while not live
+    property var liveSettings: null
+    readonly property var currentShare: Object.assign({}, streamSettings, { window: streamSettings.source === "window" ? shareWindow : "" })
+    readonly property bool streamEdited: streamLive && liveSettings !== null && JSON.stringify(liveSettings) !== JSON.stringify(currentShare)
+
+    onStreamLiveChanged: {
+        if (!streamLive)
+            liveSettings = null;
+        else if (liveSettings === null)
+            liveSettings = currentShare;
+    }
+
+    // Apply the panel's edits to the running stream: quality goes onto it as it runs; a new
+    // source or other sound needs a new stream (the web client cannot swap them), so it stops
+    // and starts again
+    function updateStream() {
+        if (!streamEdited)
+            return;
+        const was = liveSettings, now = currentShare;
+        const restart = ["source", "window", "audio", "exclude", "include"].some(k => JSON.stringify(was[k]) !== JSON.stringify(now[k]));
+        liveSettings = now;
+        if (restart) {
+            stopStream();
+            restartTimer.restart();
+        } else {
+            send({ cmd: "stream_quality", resolution: now.resolution, fps: now.fps, hint: now.hint });
+        }
+    }
+
+    Timer {
+        id: restartTimer
+        interval: 1200
+        onTriggered: root.startStream()
+    }
+
+    function listAudio() {
+        send({ cmd: "audio_sources" });
+    }
+
+    // The screen or window is picked in the desktop portal after this; Vesktop's own picker
+    // is answered by the plugin with these settings
+    function startStream() {
+        const st = streamSettings;
+        liveSettings = currentShare;
+        // facet-share-picker answers the portal with this; "" leaves the choice to its picker
+        const target = st.source === "window" ? (shareWindow !== "" ? `window:${shareWindow}` : "") : st.source;
+        Quickshell.execDetached(["sh", "-c", 'f="$XDG_RUNTIME_DIR/facet-share-target"; if [ -n "$1" ]; then printf %s "$1" > "$f"; else rm -f "$f"; fi', "share-target", target]);
+        const names = st.audio === "system" ? st.exclude : st.audio === "apps" ? st.include : [];
+        const nodes = audioSources.filter(a => names.includes(a.name)).map(a => a.node);
+        send({ cmd: "start_stream", resolution: st.resolution, fps: st.fps, hint: st.hint, audio: st.audio, nodes });
+    }
+
+    function stopStream() {
+        send({ cmd: "stop_stream" });
+    }
 
     // The overlay is on screen (Config.voiceOverlayWhen); then joins, leaves and your mute
     // go there instead of, or as well as, a notification (Config.voiceOverlayFeed)
@@ -296,6 +376,26 @@ Singleton {
             break;
         case "stream":
             root.setStream(event);
+            break;
+        case "audio_sources":
+            audioSourcesOk = event.ok !== false;
+            audioSources = event.list ?? [];
+            break;
+        case "stream_log":
+            console.info(`discord stream: ${event.step}`);
+            break;
+        case "stream_error":
+            console.warn(`discord stream: ${event.error}`);
+            Notifications.push({
+                app: "discord",
+                rule: "dc.self",
+                kind: "mini",
+                logged: false,
+                timeout: 6000,
+                glyph: "✕",
+                title: "stream did not start",
+                body: event.error ?? ""
+            });
             break;
         case "speaking": {
             const next = Object.assign({}, speaking);

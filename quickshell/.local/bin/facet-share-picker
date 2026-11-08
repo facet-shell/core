@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# facet-share-picker: xdg-desktop-portal-hyprland's screen share picker
+# (screencopy:custom_picker_binary in ~/.config/hypr/xdph.conf).
+#
+# When the shell asked for a source a moment ago (Discord's stream panel writes
+# $XDG_RUNTIME_DIR/facet-share-target: "screen:DP-2" or "window:<hyprland address>"), that
+# source is picked without asking. Anything else gets Hyprland's normal picker.
+#
+# The portal reads one line from stdout: "[SELECTION]<flags>/screen:<output>" or
+# "[SELECTION]<flags>/window:<handle>", flag "r" allows a restore token. Windows come in
+# XDPH_WINDOW_SHARING_LIST as <handle>[HC>]<class>[HT>]<title>[HE>]<address, decimal>[HA>]...
+
+set -u
+target_file="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/facet-share-target"
+
+log="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/facet-share-picker.log"
+
+normal() {
+    echo "$(date +%T) fallback to hyprland-share-picker (target: ${target:-none})" >>"$log"
+    exec hyprland-share-picker "$@"
+}
+
+pick() {
+    echo "$(date +%T) picked $1" >>"$log"
+    printf '[SELECTION]r/%s\n' "$1"
+    exit 0
+}
+
+# Only a request from the last 90 seconds counts, and only once
+[[ -f $target_file ]] || normal "$@"
+age=$(( $(date +%s) - $(stat -c %Y "$target_file") ))
+target=$(<"$target_file")
+rm -f "$target_file"
+(( age <= 90 )) || normal "$@"
+
+case $target in
+screen:*)
+    # The portal checks the name itself (hyprctl does not work from the portal service)
+    pick "$target"
+    ;;
+window:*)
+    # Hyprland names windows in hex (0x5644…), the portal's list in decimal
+    address=${target#window:}
+    address=$(( 16#${address#0x} ))
+    list=${XDPH_WINDOW_SHARING_LIST:-}
+    # Split the list into entries at [HA>] and find the one with this address
+    while [[ -n $list ]]; do
+        entry=${list%%"[HA>]"*}
+        if [[ $entry == "$list" ]]; then
+            list=""
+        else
+            list=${list#*"[HA>]"}
+        fi
+        handle=${entry%%"[HC>]"*}
+        entry_address=${entry##*"[HE>]"}
+        if [[ -n $handle && $entry_address == "$address" ]]; then
+            pick "window:$handle"
+        fi
+    done
+    echo "$(date +%T) no window $address in: ${XDPH_WINDOW_SHARING_LIST:-}" >>"$log"
+    ;;
+esac
+
+normal "$@"
