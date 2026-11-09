@@ -6,10 +6,20 @@ app-specific password, Google over the Calendar API with an OAuth login in the b
 Passwords and tokens live in the keyring (secret-tool, service "facet-calendar"); the list of
 accounts in ~/.config/facet/calendar.json (no secrets in it).
 
-  facet-calendar setup icloud               asks for the Apple ID and an app-specific password
-  facet-calendar setup google <client.json> logs in through the browser with your own OAuth
-                                            desktop client (the JSON Google Cloud hands out)
-  facet-calendar remove <account>           forgets an account ("icloud:<apple id>", "google:<mail>")
+  facet-calendar setup icloud [--apple-id <mail>] [--password-stdin]
+                                            asks for the Apple ID and an app-specific password;
+                                            --password-stdin reads the password as one line from
+                                            stdin instead (for the settings app, never on argv)
+  facet-calendar setup google <client.json> [--no-browser]
+                                            logs in through the browser with your own OAuth
+                                            desktop client (the JSON Google Cloud hands out);
+                                            prints the login URL, waits up to five minutes
+  facet-calendar accounts [--json] [--offline]
+                                            the accounts and their calendars; asks each one, so a
+                                            wrong password shows (--offline: only the list).
+                                            JSON: [{ key, kind, name, calendars, ok, error }]
+  facet-calendar remove <account>           forgets an account ("icloud:<apple id>", "google:<mail>"
+                                            or just the mail when it is unique)
   facet-calendar status                     the accounts, as JSON
   facet-calendar events <from> <to>         events from <from> up to <to> (YYYY-MM-DD, <to> not
                                             included) as one JSON object:
@@ -58,6 +68,10 @@ def local_zone():
 LOCAL = local_zone()
 
 NS = {"d": "DAV:", "c": "urn:ietf:params:xml:ns:caldav", "a": "http://apple.com/ns/ical/"}
+
+
+def say(msg):
+    print(msg, flush=True)
 
 
 def die(msg, code=1):
@@ -387,9 +401,16 @@ def google_add(acc, cal_id, title, st, en, all_day):
             {"Content-Type": "application/json"}, auth)
 
 
-def google_login(client_file):
-    with open(os.path.expanduser(client_file)) as f:
-        raw = json.load(f)
+def google_login(client_file, browser=True):
+    try:
+        with open(os.path.expanduser(client_file)) as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        die(f"no file {client_file}")
+    except (OSError, ValueError) as e:
+        die(f"could not read {client_file} as JSON: {e}")
+    if not isinstance(raw, dict):
+        die("that file is not an OAuth client JSON")
     client = raw.get("installed") or raw.get("web") or raw
     cid, csecret = client.get("client_id"), client.get("client_secret")
     if not cid or not csecret:
@@ -421,14 +442,20 @@ def google_login(client_file):
         "access_type": "offline", "prompt": "consent", "state": state,
         "code_challenge": challenge, "code_challenge_method": "S256",
     })
-    print(f"Opening the Google login in your browser. If nothing opens:\n{url}\n")
-    webbrowser.open(url)
-    thread = threading.Thread(target=server.handle_request)
+    if browser:
+        say("Opening the Google login in your browser. If nothing opens, open this address:")
+        webbrowser.open(url)
+    else:
+        say("Open this address to log in:")
+    say(url)
+    say("Waiting for the login (up to five minutes)…")
+    thread = threading.Thread(target=server.handle_request, daemon=True)
     thread.start()
     thread.join(300)
     server.server_close()
     if "code" not in got:
         die(f"no answer from Google: {got.get('error', 'timed out')}")
+    say("Logged in, fetching the token…")
     form = urllib.parse.urlencode({"client_id": cid, "client_secret": csecret, "code": got["code"],
                                    "code_verifier": verifier, "grant_type": "authorization_code", "redirect_uri": redirect})
     _, text, _ = request("POST", "https://oauth2.googleapis.com/token", form, {"Content-Type": "application/x-www-form-urlencoded"})
@@ -440,20 +467,32 @@ def google_login(client_file):
     key = f"google:{mail}"
     secret_set(key, json.dumps({"client_id": cid, "client_secret": csecret, "refresh_token": tok["refresh_token"]}))
     add_account({"key": key, "kind": "google", "user": mail})
-    print(f"Connected {mail}.")
+    say(f"Connected {mail}.")
 
 
-def icloud_login():
-    user = input("Apple ID (mail): ").strip()
-    password = getpass.getpass("App-specific password (appleid.apple.com → Sign-In and Security): ").strip()
+def icloud_login(user=None, password_stdin=False):
+    if not user:
+        if password_stdin or not sys.stdin.isatty():
+            die("--apple-id is needed with --password-stdin", 2)
+        user = input("Apple ID (mail): ").strip()
+    if password_stdin:
+        password = sys.stdin.readline().strip()
+    else:
+        password = getpass.getpass("App-specific password (appleid.apple.com → Sign-In and Security): ").strip()
+    if not user or not password:
+        die("the Apple ID and the password must not be empty", 2)
+    say(f"Asking iCloud for the calendars of {user}…")
     try:
         cals = icloud_calendars(user, password)
     except Exception as e:
-        die(f"iCloud did not take it: {e}")
+        msg = str(e)
+        if "answered 401" in msg:
+            msg = "wrong Apple ID or app-specific password (use an app-specific one, not your Apple ID password)"
+        die(f"iCloud did not take it: {msg}")
     key = f"icloud:{user}"
     secret_set(key, password)
     add_account({"key": key, "kind": "icloud", "user": user})
-    print(f"Connected {user}: " + ", ".join(c["name"] for c in cals))
+    say(f"Connected {user}: " + (", ".join(c["name"] for c in cals) or "no calendars"))
 
 
 def add_account(acc):
@@ -502,20 +541,105 @@ def cmd_add(cal_id, title, start, end=None):
     print(json.dumps({"ok": True}))
 
 
+def account_check(acc):
+    """One account as the settings app lists it; asks the server unless offline."""
+    out = {"key": acc["key"], "kind": acc["kind"], "name": acc.get("user", acc["key"]),
+           "calendars": [], "ok": True, "error": ""}
+    return out
+
+
+def check_live(out, acc):
+    try:
+        if acc["kind"] == "google":
+            auth = google_token(acc)
+            items = google_get(f"{GOOGLE_API}/users/me/calendarList?minAccessRole=reader", auth).get("items", [])
+            out["calendars"] = [c.get("summaryOverride") or c.get("summary", "Calendar") for c in items
+                                if not c.get("hidden") and c.get("selected") is not False]
+        else:
+            out["calendars"] = [c["name"] for c in icloud_calendars(acc["user"], secret_get(acc["key"]))]
+    except Exception as e:
+        out["ok"] = False
+        out["error"] = str(e)
+
+
+def cmd_accounts(as_json, offline):
+    accounts = load_config()["accounts"]
+    rows = [account_check(a) for a in accounts]
+    if not offline:
+        threads = [threading.Thread(target=check_live, args=(r, a)) for r, a in zip(rows, accounts)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(60)
+    if as_json:
+        print(json.dumps(rows))
+        return
+    if not rows:
+        print("No calendar accounts. facet-calendar setup icloud | google <client.json>")
+    for r in rows:
+        state = "" if offline else (" – " + (", ".join(r["calendars"]) or "no calendars") if r["ok"] else f" – error: {r['error']}")
+        print(f"{r['key']}{state}")
+
+
+def cmd_remove(name):
+    cfg = load_config()
+    keys = [a["key"] for a in cfg["accounts"]]
+    if name not in keys:
+        match = [k for k in keys if k.split(":", 1)[-1] == name]
+        if len(match) != 1:
+            die(f"no account {name}" + (f" (have: {', '.join(keys)})" if keys else ""))
+        name = match[0]
+    cfg["accounts"] = [a for a in cfg["accounts"] if a["key"] != name]
+    save_config(cfg)
+    secret_clear(name)
+    say(f"Removed {name}.")
+
+
+def take_flag(args, flag, value=False):
+    """Removes --flag (and its value) from args; returns True/the value, or None."""
+    for i, a in enumerate(args):
+        if a == flag:
+            if not value:
+                del args[i]
+                return True
+            if i + 1 >= len(args):
+                die(f"{flag} needs a value", 2)
+            v = args[i + 1]
+            del args[i:i + 2]
+            return v
+        if value and a.startswith(flag + "="):
+            del args[i]
+            return a.split("=", 1)[1]
+    return None
+
+
 def main(argv):
     if len(argv) < 2 or argv[1] in ("-h", "--help", "help"):
         print(__doc__.strip())
         return
     cmd = argv[1]
-    if cmd == "setup" and len(argv) >= 3 and argv[2] == "icloud":
-        icloud_login()
-    elif cmd == "setup" and len(argv) >= 4 and argv[2] == "google":
-        google_login(argv[3])
+    rest = list(argv[2:])
+    if cmd == "setup" and rest[:1] == ["icloud"]:
+        rest = rest[1:]
+        user = take_flag(rest, "--apple-id", value=True)
+        pw_stdin = bool(take_flag(rest, "--password-stdin"))
+        if rest:
+            die(f"unknown argument {rest[0]} (the password goes over stdin with --password-stdin)", 2)
+        icloud_login(user, pw_stdin)
+    elif cmd == "setup" and rest[:1] == ["google"]:
+        rest = rest[1:]
+        no_browser = bool(take_flag(rest, "--no-browser"))
+        if len(rest) != 1:
+            die("usage: facet-calendar setup google <client_secret.json> [--no-browser]", 2)
+        google_login(rest[0], browser=not no_browser)
+    elif cmd == "accounts":
+        as_json = bool(take_flag(rest, "--json"))
+        offline = bool(take_flag(rest, "--offline"))
+        if rest:
+            die(f"unknown argument {rest[0]}", 2)
+        cmd_accounts(as_json, offline)
     elif cmd == "remove" and len(argv) == 3:
-        cfg = load_config()
-        cfg["accounts"] = [a for a in cfg["accounts"] if a["key"] != argv[2]]
-        save_config(cfg)
-        secret_clear(argv[2])
+        cmd_remove(argv[2])
     elif cmd == "status":
         print(json.dumps(load_config()))
     elif cmd == "events" and len(argv) == 4:
